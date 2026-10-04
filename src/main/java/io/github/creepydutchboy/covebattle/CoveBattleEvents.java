@@ -4,6 +4,7 @@ import io.github.creepydutchboy.covebattle.command.CoveBattleCommands;
 import io.github.creepydutchboy.covebattle.update.UpdateOutcome;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -49,7 +50,7 @@ public final class CoveBattleEvents {
         }
     }
 
-    private static Component prefix() {
+    private static MutableComponent prefix() {
         return Component.literal("[" + CoveBattle.MOD_NAME + "] ").withStyle(ChatFormatting.GOLD);
     }
 }

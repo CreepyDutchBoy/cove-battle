@@ -1,12 +1,14 @@
 package io.github.creepydutchboy.covebattle;
 
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-/** Config file: {@code config/covebattle-common.toml}. */
-@EventBusSubscriber(modid = CoveBattle.MODID, bus = EventBusSubscriber.Bus.MOD)
+/**
+ * Config file: {@code config/covebattle-common.toml}.
+ *
+ * <p>{@link #onLoad} is registered on the mod event bus from the mod constructor rather than
+ * through {@code @EventBusSubscriber(bus = MOD)}, which NeoForge has deprecated for removal.
+ */
 public final class CoveBattleConfig {
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -62,8 +64,7 @@ public final class CoveBattleConfig {
 
     private CoveBattleConfig() {}
 
-    @SubscribeEvent
-    static void onLoad(ModConfigEvent event) {
+    public static void onLoad(ModConfigEvent event) {
         if (event.getConfig().getSpec() != SPEC) return;
         autoUpdate = AUTO_UPDATE.get();
         checkOnStartup = CHECK_ON_STARTUP.get();

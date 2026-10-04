@@ -21,6 +21,7 @@ public class CoveBattle {
 
     public CoveBattle(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, CoveBattleConfig.SPEC);
+        modEventBus.addListener(CoveBattleConfig::onLoad);
         modEventBus.addListener(this::commonSetup);
     }
 
