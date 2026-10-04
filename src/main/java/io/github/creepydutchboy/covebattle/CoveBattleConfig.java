@@ -42,6 +42,8 @@ public final class CoveBattleConfig {
     private static final ModConfigSpec.ConfigValue<String> DEFAULT_MODE;
     private static final ModConfigSpec.BooleanValue FORCE_ADVENTURE;
     private static final ModConfigSpec.BooleanValue SHOWDOWN_GLOW;
+    private static final ModConfigSpec.BooleanValue SCREEN_EFFECTS;
+    private static final ModConfigSpec.BooleanValue TITLE_SCREEN_BUTTON;
 
     static {
         BUILDER.comment("Self-update settings. Updates are downloaded into the mods folder and",
@@ -121,6 +123,10 @@ public final class CoveBattleConfig {
                 .define("forceAdventure", true);
         SHOWDOWN_GLOW = BUILDER.comment("Make the remaining players glow once the border starts closing.")
                 .define("showdownGlow", true);
+        SCREEN_EFFECTS = BUILDER.comment("Client only: full-screen effects while spectating and while the border closes.")
+                .define("clientScreenEffects", true);
+        TITLE_SCREEN_BUTTON = BUILDER.comment("Client only: add a Cove Battle button to the main menu.")
+                .define("titleScreenButton", true);
         BUILDER.pop();
     }
 
@@ -141,6 +147,7 @@ public final class CoveBattleConfig {
     public static int maxPlayers = 32, maxPerTeam = 16;
     public static String defaultMode = "SOLO";
     public static boolean forceAdventure = true, showdownGlow = true;
+    public static boolean clientScreenEffects = true, titleScreenButton = true;
 
     private CoveBattleConfig() {}
 
@@ -175,5 +182,7 @@ public final class CoveBattleConfig {
         defaultMode = DEFAULT_MODE.get();
         forceAdventure = FORCE_ADVENTURE.get();
         showdownGlow = SHOWDOWN_GLOW.get();
+        clientScreenEffects = SCREEN_EFFECTS.get();
+        titleScreenButton = TITLE_SCREEN_BUTTON.get();
     }
 }

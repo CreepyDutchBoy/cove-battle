@@ -120,6 +120,31 @@ where the old datapack's arena was.
 Adventure mode is kept on players while `forceAdventure` is true, but **creative and spectator are
 never touched**, so building and moderating still work.
 
+## The Cove map, in the jar
+
+The main menu gains a **Cove Battle** button. It opens a hub with:
+
+- **Play the Cove map** — unpacks the bundled map into `saves/` and loads it
+- **Join a Cove Battle server** — the normal multiplayer screen
+- **Install the map only** — unpack without playing
+
+Hosting is not a separate button on purpose: in Minecraft you host by playing a world and
+using **Esc → Open to LAN**, so the hub says that rather than pretending to stand up a server.
+
+The map ships inside the jar (20 MB), so the mod download carries it. See
+[MAP_CREDITS.md](MAP_CREDITS.md) for provenance and the redistribution caveat.
+
+## Screen effects
+
+Two post-processing shaders, both inferred from what the client already knows, so no custom
+packets are involved:
+
+- **Eliminated** — while spectating, colour drains out and the edges close in
+- **Showdown** — while the world border is shrinking, a breathing red rim and raised contrast
+
+Either can be turned off with `clientScreenEffects`. If a shader fails to load it is disabled
+for the session and logged; it can never take the game down with it.
+
 ## How updating works
 
 On startup the mod asks GitHub for this repository's releases, newest first, and takes the
