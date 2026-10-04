@@ -27,6 +27,7 @@ public class CoveBattle {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("{} {} starting on Minecraft {}", MOD_NAME, UpdateBridge.modVersion(), UpdateBridge.mcVersion());
+        LOGGER.info("Updates are managed at {}", UpdateBridge.settings().modsDir().resolve(UpdateBridge.JAR_NAME));
         UpdateBridge.kickOffStartupCheck();
     }
 }

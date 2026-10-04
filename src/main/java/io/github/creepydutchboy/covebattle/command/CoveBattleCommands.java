@@ -46,6 +46,9 @@ public final class CoveBattleCommands {
                         .withStyle(ChatFormatting.WHITE))
                 .append(Component.literal("   auto-install: ").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(CoveBattleConfig.autoUpdate ? "on" : "off").withStyle(ChatFormatting.WHITE)), false);
+        source.sendSuccess(() -> Component.literal("Managed jar: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(UpdateBridge.settings().modsDir().resolve(UpdateBridge.JAR_NAME).toString())
+                        .withStyle(ChatFormatting.DARK_GRAY)), false);
         source.sendSuccess(() -> describe(outcome), false);
         if (UpdateBridge.isRunning()) {
             source.sendSuccess(() -> Component.literal("A check is running right now.").withStyle(ChatFormatting.DARK_GRAY), false);
