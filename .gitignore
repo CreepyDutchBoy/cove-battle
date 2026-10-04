@@ -1,0 +1,25 @@
+# gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# moddev run dirs
+run/
+runs/
+run-data/
+src/generated/
+
+# ide
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.eclipse/
+bin/
+.settings/
+.classpath
+.project
+
+# os
+.DS_Store

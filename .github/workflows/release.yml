@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Derive mod version from the tag
+        run: echo "MOD_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build and stage release assets
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build packageDist -Pmod_version="$MOD_VERSION" --no-daemon --console=plain
+
+      - name: Show what will be published
+        run: |
+          ls -l build/dist
+          cat build/dist/covebattle.update.json
+
+      # The in-game updater reads covebattle.update.json first, verifies covebattle.jar
+      # against the sha256 in it, and refuses anything whose "minecraft" field does not
+      # match the running game. Publishing all three assets is what makes a release installable.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Cove Battle ${{ env.MOD_VERSION }}
+          generate_release_notes: true
+          files: |
+            build/dist/covebattle.jar
+            build/dist/covebattle.jar.sha256
+            build/dist/covebattle.update.json

@@ -1,0 +1,6 @@
+{
+  "covebattle.update.available": "Cove Battle %s is available.",
+  "covebattle.update.installed": "Cove Battle updated to %s — restart the game to apply.",
+  "covebattle.update.current": "Cove Battle is up to date (%s).",
+  "covebattle.update.disabled": "Cove Battle auto-update is disabled in the config."
+}

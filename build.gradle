@@ -1,0 +1,123 @@
+plugins {
+    id 'idea'
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Mojang ships Java 21 to end users for 1.21.1, so target Java 21.
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', ''
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+// Expands ${...} placeholders in src/main/templates (neoforge.mods.toml) using gradle.properties.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : version.toString(),
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+            update_repo_owner      : update_repo_owner,
+            update_repo_name       : update_repo_name
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// ---------------------------------------------------------------------------
+// Release packaging.
+// Produces build/dist/ with a FIXED-NAME jar (versioned names risk duplicate-mod
+// boot failures after a self-update), its sha256, and the manifest the in-game
+// updater reads. CI uploads this whole directory as the release assets.
+// ---------------------------------------------------------------------------
+tasks.register('packageDist') {
+    description = 'Stages release assets (fixed-name jar + sha256 + update manifest) into build/dist.'
+    group = 'build'
+
+    def jarTask = tasks.named('jar')
+    dependsOn jarTask
+
+    def outDir = layout.buildDirectory.dir('dist')
+    def modid = mod_id
+    def mcVersion = minecraft_version
+    def neoVersion = neo_version
+    def modVersion = version.toString()
+
+    inputs.files jarTask
+    inputs.property 'modVersion', modVersion
+    outputs.dir outDir
+
+    doLast {
+        def dir = outDir.get().asFile
+        dir.deleteDir()
+        dir.mkdirs()
+
+        def jarFile = new File(dir, "${modid}.jar")
+        jarFile.bytes = jarTask.get().archiveFile.get().asFile.bytes
+
+        def sha = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(jarFile.bytes).encodeHex().toString()
+
+        new File(dir, "${modid}.jar.sha256").text = "${sha}  ${modid}.jar\n"
+        new File(dir, "${modid}.update.json").text = groovy.json.JsonOutput.prettyPrint(
+                groovy.json.JsonOutput.toJson([
+                        version     : modVersion,
+                        minecraft   : mcVersion,
+                        neoforge_min: neoVersion,
+                        jar         : "${modid}.jar".toString(),
+                        sha256      : sha
+                ]))
+
+        logger.lifecycle("Staged release assets in {} (version {}, sha256 {})", dir, modVersion, sha)
+    }
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
