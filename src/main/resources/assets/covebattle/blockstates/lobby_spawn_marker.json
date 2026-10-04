@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "covebattle:block/lobby_spawn_marker"
+    }
+  }
+}

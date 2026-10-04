@@ -38,6 +38,47 @@ built-in updater.
 A round with nobody left is a tie. If the border reaches its floor and both players are still
 alive after 30 seconds, that is also a tie and scores nothing.
 
+### Modes
+
+`/covebattle start solo` — free-for-all, last player standing takes the round.
+`/covebattle start teams` — Red against Blue, last team with anyone standing takes the round.
+Bare `/covebattle start` uses `[rules] defaultMode`. Up to **32 players**, **16 per team**;
+friendly fire is off and teammates show through invisibility.
+
+### Arena markers
+
+A creative tab, **Cove Battle: Arena Markers**, holds six blocks. Place them instead of editing
+coordinates — the arena scan finds them because each one carries a block entity, so they turn up in
+the same chunk walk that finds the chests.
+
+| Marker | Does |
+|---|---|
+| Arena Centre | The middle: loot tier origin, border centre, spawn-ring fallback |
+| Lobby Spawn | Where players are sent between matches |
+| Red / Blue Team Spawn | Team spawns; place up to sixteen of each |
+| Free-for-all Spawn | Solo spawns; place as many as you expect players |
+| Arena Bound | Place at the edge; the furthest one sets the play radius |
+
+Anything you do not place falls back to the config, so a bare world still works. **Chests and
+barrels are never markers** — they are detected automatically, so there is nothing to place or
+maintain for loot. Right-click any marker to be told what it is.
+
+### Custom items
+
+A second tab, **Cove Battle: Items**. They are real registered items, and they appear in loot:
+the ability items are a centre-tier prize, so the middle stays worth contesting.
+
+| Item | Does |
+|---|---|
+| Coveslayer | Netherite-tier sword, faster swing, epic rarity |
+| Storm Egg | Calls visual-only lightning on what you are looking at, up to 40 blocks, 3.5♥ in a small splash — it cannot set your map on fire |
+| Smoke Bomb | Invisibility and speed for you, blindness and nausea for hostiles within 10 blocks |
+| War Horn | Strength II to your side within 24 blocks, glowing on hostiles within 64; reusable on a 10s cooldown |
+| Siphon Flask | Heals you 3♥ plus absorption, drains 2♥ and weakens the nearest hostile within 12 |
+| Ghost Boots | Outer-tier trinket |
+
+Team awareness is real: abilities never hit your own side.
+
 ### Loot
 
 Two tiers, defined in code (`BattleLoot`) rather than as data-pack tables:

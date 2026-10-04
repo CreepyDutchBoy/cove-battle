@@ -1,6 +1,10 @@
 package io.github.creepydutchboy.covebattle;
 
 import com.mojang.logging.LogUtils;
+import io.github.creepydutchboy.covebattle.registry.CBBlockEntities;
+import io.github.creepydutchboy.covebattle.registry.CBBlocks;
+import io.github.creepydutchboy.covebattle.registry.CBItems;
+import io.github.creepydutchboy.covebattle.registry.CBTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -20,6 +24,11 @@ public class CoveBattle {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public CoveBattle(IEventBus modEventBus, ModContainer modContainer) {
+        CBBlocks.BLOCKS.register(modEventBus);
+        CBItems.ITEMS.register(modEventBus);
+        CBBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        CBTabs.TABS.register(modEventBus);
+
         modContainer.registerConfig(ModConfig.Type.COMMON, CoveBattleConfig.SPEC);
         modEventBus.addListener(CoveBattleConfig::onLoad);
         modEventBus.addListener(this::commonSetup);

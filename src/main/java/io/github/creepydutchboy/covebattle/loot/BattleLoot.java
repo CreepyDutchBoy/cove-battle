@@ -1,5 +1,6 @@
 package io.github.creepydutchboy.covebattle.loot;
 
+import io.github.creepydutchboy.covebattle.registry.CBItems;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -35,8 +36,12 @@ public final class BattleLoot {
         }
     }
 
+    private static List<Entry> centrePool;
+    private static List<Entry> outerPool;
+
     /** Centre platform: the strong stuff. */
-    private static final List<Entry> CENTRE = List.of(
+    private static List<Entry> buildCentre() {
+        return List.of(
             new Entry(Items.NETHERITE_SWORD, 1, 1, 2, Map.of(Enchantments.SHARPNESS, 2)),
             new Entry(Items.DIAMOND_SWORD, 1, 1, 7, Map.of(Enchantments.SHARPNESS, 2)),
             new Entry(Items.DIAMOND_AXE, 1, 1, 6, Map.of(Enchantments.SHARPNESS, 1)),
@@ -55,11 +60,18 @@ public final class BattleLoot {
             new Entry(Items.ENDER_PEARL, 2, 4, 5),
             new Entry(Items.TOTEM_OF_UNDYING, 1, 1, 1),
             new Entry(Items.COOKED_BEEF, 3, 6, 7),
-            new Entry(Items.GOLDEN_CARROT, 3, 6, 5)
-    );
+            new Entry(Items.GOLDEN_CARROT, 3, 6, 5),
+            // Custom gear is a centre-only prize, so the middle stays worth contesting.
+            new Entry(CBItems.COVESLAYER.get(), 1, 1, 2),
+            new Entry(CBItems.STORM_EGG.get(), 1, 2, 3),
+            new Entry(CBItems.WAR_HORN.get(), 1, 1, 2),
+            new Entry(CBItems.SIPHON_FLASK.get(), 1, 2, 3)
+        );
+    }
 
     /** Outer ring: usable, but you give something up by staying away from the middle. */
-    private static final List<Entry> OUTER = List.of(
+    private static List<Entry> buildOuter() {
+        return List.of(
             new Entry(Items.IRON_SWORD, 1, 1, 7),
             new Entry(Items.STONE_SWORD, 1, 1, 8),
             new Entry(Items.IRON_AXE, 1, 1, 6),
@@ -81,8 +93,21 @@ public final class BattleLoot {
             new Entry(Items.APPLE, 2, 4, 7),
             new Entry(Items.GOLDEN_APPLE, 1, 1, 2),
             new Entry(Items.SNOWBALL, 4, 8, 4),
-            new Entry(Items.EGG, 2, 5, 3)
-    );
+            new Entry(Items.EGG, 2, 5, 3),
+            new Entry(CBItems.SMOKE_BOMB.get(), 1, 2, 4),
+            new Entry(CBItems.GHOST_BOOTS.get(), 1, 1, 2)
+        );
+    }
+
+    private static List<Entry> centre() {
+        if (centrePool == null) centrePool = buildCentre();
+        return centrePool;
+    }
+
+    private static List<Entry> outer() {
+        if (outerPool == null) outerPool = buildOuter();
+        return outerPool;
+    }
 
     private static final int CENTRE_ROLLS_MIN = 4;
     private static final int CENTRE_ROLLS_MAX = 6;
@@ -99,7 +124,7 @@ public final class BattleLoot {
     public static void fill(ServerLevel level, Container container, boolean centre, RandomSource random) {
         container.clearContent();
 
-        List<Entry> pool = centre ? CENTRE : OUTER;
+        List<Entry> pool = centre ? centre() : outer();
         int rolls = centre
                 ? CENTRE_ROLLS_MIN + random.nextInt(CENTRE_ROLLS_MAX - CENTRE_ROLLS_MIN + 1)
                 : OUTER_ROLLS_MIN + random.nextInt(OUTER_ROLLS_MAX - OUTER_ROLLS_MIN + 1);
@@ -139,10 +164,10 @@ public final class BattleLoot {
     }
 
     public static int centrePoolSize() {
-        return CENTRE.size();
+        return centre().size();
     }
 
     public static int outerPoolSize() {
-        return OUTER.size();
+        return outer().size();
     }
 }

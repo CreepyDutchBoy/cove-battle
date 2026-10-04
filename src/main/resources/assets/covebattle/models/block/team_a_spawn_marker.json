@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "covebattle:block/team_a_spawn_marker"
+  }
+}

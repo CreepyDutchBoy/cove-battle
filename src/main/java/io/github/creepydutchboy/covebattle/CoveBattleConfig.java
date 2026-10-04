@@ -37,6 +37,9 @@ public final class CoveBattleConfig {
     private static final ModConfigSpec.IntValue ROUNDS_TO_WIN;
     private static final ModConfigSpec.IntValue RESTOCK_COUNT;
     private static final ModConfigSpec.IntValue MIN_PLAYERS;
+    private static final ModConfigSpec.IntValue MAX_PLAYERS;
+    private static final ModConfigSpec.IntValue MAX_PER_TEAM;
+    private static final ModConfigSpec.ConfigValue<String> DEFAULT_MODE;
     private static final ModConfigSpec.BooleanValue FORCE_ADVENTURE;
     private static final ModConfigSpec.BooleanValue SHOWDOWN_GLOW;
 
@@ -107,6 +110,12 @@ public final class CoveBattleConfig {
                 .defineInRange("restockCount", 4, 1, 64);
         MIN_PLAYERS = BUILDER.comment("Players needed to start a match.")
                 .defineInRange("minPlayers", 2, 1, 16);
+        MAX_PLAYERS = BUILDER.comment("Hard cap on players in one match.")
+                .defineInRange("maxPlayers", 32, 2, 64);
+        MAX_PER_TEAM = BUILDER.comment("Hard cap per team in team mode.")
+                .defineInRange("maxPerTeam", 16, 1, 32);
+        DEFAULT_MODE = BUILDER.comment("Mode used by /covebattle start with no argument: SOLO or TEAMS.")
+                .define("defaultMode", "SOLO");
         FORCE_ADVENTURE = BUILDER.comment("Keep players in adventure mode. Creative and spectator are never touched,",
                         "so building and moderating still work.")
                 .define("forceAdventure", true);
@@ -129,6 +138,8 @@ public final class CoveBattleConfig {
     public static int graceSeconds = 15, matchSeconds = 90, borderStepSeconds = 12;
     public static int roundEndSeconds = 10, restockSeconds = 30;
     public static int roundsToWin = 2, restockCount = 4, minPlayers = 2;
+    public static int maxPlayers = 32, maxPerTeam = 16;
+    public static String defaultMode = "SOLO";
     public static boolean forceAdventure = true, showdownGlow = true;
 
     private CoveBattleConfig() {}
@@ -159,6 +170,9 @@ public final class CoveBattleConfig {
         roundsToWin = ROUNDS_TO_WIN.get();
         restockCount = RESTOCK_COUNT.get();
         minPlayers = MIN_PLAYERS.get();
+        maxPlayers = MAX_PLAYERS.get();
+        maxPerTeam = MAX_PER_TEAM.get();
+        defaultMode = DEFAULT_MODE.get();
         forceAdventure = FORCE_ADVENTURE.get();
         showdownGlow = SHOWDOWN_GLOW.get();
     }

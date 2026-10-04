@@ -1,18 +1,15 @@
 package io.github.creepydutchboy.covebattle.loot;
 
-import io.github.creepydutchboy.covebattle.CoveBattle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Container;
-import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.chunk.LevelChunk;
+
+import java.util.HashSet;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -38,45 +35,22 @@ public final class ContainerRegistry {
     private ContainerRegistry() {}
 
     /**
-     * Walks the chunks covering the arena and records every chest and barrel inside the radius.
-     * Chunks are loaded as needed, which is deliberate: the whole arena should be live for the
-     * match anyway.
+     * Builds the registry from positions already collected by {@link
+     * io.github.creepydutchboy.covebattle.game.ArenaScan}, assigning each one a loot tier by its
+     * distance from the arena centre.
      */
-    public static ContainerRegistry scan(ServerLevel level, BlockPos centre, int radius, int centreRadius) {
+    public static ContainerRegistry of(List<BlockPos> positions, BlockPos centre, int radius, int centreRadius) {
         ContainerRegistry registry = new ContainerRegistry();
-
-        int minChunkX = (centre.getX() - radius) >> 4;
-        int maxChunkX = (centre.getX() + radius) >> 4;
-        int minChunkZ = (centre.getZ() - radius) >> 4;
-        int maxChunkZ = (centre.getZ() + radius) >> 4;
-
         long radiusSq = (long) radius * radius;
         long centreSq = (long) centreRadius * centreRadius;
-
-        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
-            for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
-                LevelChunk chunk = level.getChunk(cx, cz);
-                for (BlockEntity be : chunk.getBlockEntities().values()) {
-                    if (!isBattleContainer(be)) continue;
-                    BlockPos pos = be.getBlockPos().immutable();
-                    long dx = pos.getX() - centre.getX();
-                    long dz = pos.getZ() - centre.getZ();
-                    long distSq = dx * dx + dz * dz;
-                    if (distSq > radiusSq) continue;
-                    registry.slots.add(new Slot(pos, distSq <= centreSq));
-                }
-            }
+        for (BlockPos pos : positions) {
+            long dx = pos.getX() - centre.getX();
+            long dz = pos.getZ() - centre.getZ();
+            long distSq = dx * dx + dz * dz;
+            if (distSq > radiusSq) continue;
+            registry.slots.add(new Slot(pos.immutable(), distSq <= centreSq));
         }
-
-        CoveBattle.LOGGER.info("Arena scan found {} containers ({} centre, {} outer) in {} chunks",
-                registry.slots.size(), registry.centreCount(), registry.size() - registry.centreCount(),
-                (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1));
         return registry;
-    }
-
-    /** Chests, trapped chests (a subclass) and barrels. Shulker boxes are deliberately excluded. */
-    private static boolean isBattleContainer(BlockEntity be) {
-        return be instanceof ChestBlockEntity || be instanceof BarrelBlockEntity;
     }
 
     public int size() {

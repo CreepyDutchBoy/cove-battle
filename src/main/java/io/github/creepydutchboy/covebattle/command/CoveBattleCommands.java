@@ -6,6 +6,8 @@ import io.github.creepydutchboy.covebattle.CoveBattle;
 import io.github.creepydutchboy.covebattle.CoveBattleConfig;
 import io.github.creepydutchboy.covebattle.UpdateBridge;
 import io.github.creepydutchboy.covebattle.game.Announcer;
+import io.github.creepydutchboy.covebattle.game.ArenaLayout;
+import io.github.creepydutchboy.covebattle.game.BattleMode;
 import io.github.creepydutchboy.covebattle.game.BattleGame;
 import io.github.creepydutchboy.covebattle.game.BattleManager;
 import io.github.creepydutchboy.covebattle.loot.BattleLoot;
@@ -42,7 +44,11 @@ public final class CoveBattleCommands {
 
                 .then(Commands.literal("start")
                         .requires(source -> source.hasPermission(2))
-                        .executes(ctx -> start(ctx.getSource())))
+                        .executes(ctx -> start(ctx.getSource(), BattleMode.byName(CoveBattleConfig.defaultMode)))
+                        .then(Commands.literal("solo")
+                                .executes(ctx -> start(ctx.getSource(), BattleMode.SOLO)))
+                        .then(Commands.literal("teams")
+                                .executes(ctx -> start(ctx.getSource(), BattleMode.TEAMS))))
                 .then(Commands.literal("stop")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> stop(ctx.getSource())))
@@ -107,7 +113,7 @@ public final class CoveBattleCommands {
         }
 
         source.sendSuccess(() -> Component.literal("Phase: ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(game.phase().name()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(game.phase().name() + " / " + game.mode().label()).withStyle(ChatFormatting.WHITE))
                 .append(Component.literal(game.phase().isLive()
                         ? "   round " + game.round() + "   alive " + game.aliveCount() + "/" + game.participantCount()
                         : "").withStyle(ChatFormatting.GRAY)), false);
@@ -135,13 +141,13 @@ public final class CoveBattleCommands {
 
     // ---- match control ----
 
-    private static int start(CommandSourceStack source) {
+    private static int start(CommandSourceStack source, BattleMode mode) {
         BattleGame game = BattleManager.game();
         if (game == null) {
             source.sendFailure(Component.literal("The game is not initialised yet."));
             return 0;
         }
-        boolean started = game.start(message -> source.sendFailure(message));
+        boolean started = game.start(source::sendFailure, mode);
         return started ? 1 : 0;
     }
 
@@ -176,6 +182,10 @@ public final class CoveBattleCommands {
                                 + ", centre tier " + CoveBattleConfig.centreTierRadius
                                 + ", border floor " + CoveBattleConfig.minRadius)
                         .withStyle(ChatFormatting.GRAY)), false);
+        ArenaLayout layout = game == null ? null : game.layout();
+        source.sendSuccess(() -> Component.literal("Layout: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(layout == null ? "not scanned yet — run /covebattle arena rescan" : layout.summary())
+                        .withStyle(ChatFormatting.WHITE)), false);
         source.sendSuccess(() -> Component.literal("Loot pools: ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(BattleLoot.centrePoolSize() + " centre entries, "
                         + BattleLoot.outerPoolSize() + " outer entries").withStyle(ChatFormatting.WHITE)), false);

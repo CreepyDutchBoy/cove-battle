@@ -1,6 +1,20 @@
 {
   "covebattle.update.available": "Cove Battle %s is available.",
-  "covebattle.update.installed": "Cove Battle updated to %s — restart the game to apply.",
+  "covebattle.update.installed": "Cove Battle updated to %s \u2014 restart the game to apply.",
   "covebattle.update.current": "Cove Battle is up to date (%s).",
-  "covebattle.update.disabled": "Cove Battle auto-update is disabled in the config."
+  "covebattle.update.disabled": "Cove Battle auto-update is disabled in the config.",
+  "itemGroup.covebattle.markers": "Cove Battle: Arena Markers",
+  "itemGroup.covebattle.items": "Cove Battle: Items",
+  "block.covebattle.arena_centre_marker": "Arena Centre Marker",
+  "block.covebattle.lobby_spawn_marker": "Lobby Spawn Marker",
+  "block.covebattle.team_a_spawn_marker": "Red Team Spawn Marker",
+  "block.covebattle.team_b_spawn_marker": "Blue Team Spawn Marker",
+  "block.covebattle.solo_spawn_marker": "Free-for-all Spawn Marker",
+  "block.covebattle.arena_bound_marker": "Arena Bound Marker",
+  "item.covebattle.storm_egg": "Storm Egg",
+  "item.covebattle.smoke_bomb": "Smoke Bomb",
+  "item.covebattle.war_horn": "War Horn",
+  "item.covebattle.siphon_flask": "Siphon Flask",
+  "item.covebattle.coveslayer": "Coveslayer",
+  "item.covebattle.ghost_boots": "Ghost Boots"
 }
