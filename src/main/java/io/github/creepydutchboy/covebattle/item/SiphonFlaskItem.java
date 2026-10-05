@@ -20,9 +20,9 @@ import java.util.List;
 /** Drains the nearest opponent to top yourself up. */
 public class SiphonFlaskItem extends AbilityItem {
 
-    private static final double RANGE = 12.0D;
-    private static final float LEECH = 4.0F;
-    private static final float HEAL = 6.0F;
+    private static final double RANGE = 14.0D;
+    private static final float LEECH = 6.0F;
+    private static final float HEAL = 8.0F;
 
     public SiphonFlaskItem(Properties properties) {
         super(properties, 80);
@@ -33,7 +33,9 @@ public class SiphonFlaskItem extends AbilityItem {
         List<ServerPlayer> targets = opponentsNear(level, player, player.getX(), player.getY(), player.getZ(), RANGE);
 
         player.heal(HEAL);
-        player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 400, 0, false, false, true));
+        player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 400, 1, false, false, true));
+        // Drinking roots you for a moment: the heal is strong, so it should cost you position.
+        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 20, 2, false, false, true));
         level.sendParticles(ParticleTypes.HEART, player.getX(), player.getY() + 1.6, player.getZ(), 10, 0.4, 0.4, 0.4, 0.1);
         sound(level, player.getX(), player.getY(), player.getZ(), SoundEvents.WITCH_DRINK, 1.0F, 1.2F);
 
@@ -59,11 +61,13 @@ public class SiphonFlaskItem extends AbilityItem {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.literal("Drink it to drain the nearest opponent.").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal("  You heal ").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.literal("6.0 (3 hearts) + Absorption I for 20.0s").withStyle(ChatFormatting.GOLD)));
+                .append(Component.literal("8.0 (4 hearts) + Absorption II for 20.0s").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  They lose ").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.literal("4.0 (2 hearts), magic type, + Weakness I for 6.0s").withStyle(ChatFormatting.GOLD)));
+                .append(Component.literal("6.0 (3 hearts), magic type, + Weakness I for 6.0s").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  Reach ").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.literal("nearest opponent within 12.0 blocks").withStyle(ChatFormatting.GOLD)));
+                .append(Component.literal("nearest opponent within 14.0 blocks").withStyle(ChatFormatting.GOLD)));
+        tooltip.add(Component.literal("  Cost ").withStyle(ChatFormatting.DARK_GRAY)
+                .append(Component.literal("Slowness III for 1.0s while it goes down").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  Cooldown ").withStyle(ChatFormatting.DARK_GRAY)
                 .append(Component.literal("4.0s, scaled by the ability cooldown mutator").withStyle(ChatFormatting.GOLD)));
         super.appendHoverText(stack, context, tooltip, flag);

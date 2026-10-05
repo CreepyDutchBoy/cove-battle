@@ -312,6 +312,10 @@ public final class CoveBattleCommands {
         source.sendSuccess(() -> Component.literal("Managed jar: ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(UpdateBridge.settings().modsDir().resolve(UpdateBridge.JAR_NAME).toString())
                         .withStyle(ChatFormatting.DARK_GRAY)), false);
+        source.sendSuccess(() -> Component.literal("Arena snapshot: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(game.snapshotVolume() == 0 ? "not captured"
+                                : game.snapshotVolume() / 1000 + "k blocks held for restore")
+                        .withStyle(ChatFormatting.WHITE)), false);
         source.sendSuccess(() -> Component.literal("Environment: ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(io.github.creepydutchboy.covebattle.update.Environment.describe())
                         .withStyle(ChatFormatting.WHITE)), false);

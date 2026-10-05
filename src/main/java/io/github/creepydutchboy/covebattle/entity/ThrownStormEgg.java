@@ -18,8 +18,8 @@ import net.minecraft.world.phys.Vec3;
 /** Lands, then calls down a visual-only bolt and hurts whoever is standing in it. */
 public class ThrownStormEgg extends BattleProjectile {
 
-    private static final double SPLASH = 3.0D;
-    private static final float DAMAGE = 7.0F;
+    private static final double SPLASH = 4.0D;
+    private static final float DAMAGE = 11.0F;
 
     public ThrownStormEgg(EntityType<? extends ThrownStormEgg> type, Level level) {
         super(type, level);

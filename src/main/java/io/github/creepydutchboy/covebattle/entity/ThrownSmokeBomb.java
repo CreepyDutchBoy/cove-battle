@@ -19,7 +19,7 @@ import net.minecraft.world.phys.Vec3;
 /** Lands in a cloud: hides whoever threw it, blinds whoever it lands next to. */
 public class ThrownSmokeBomb extends BattleProjectile {
 
-    private static final double RADIUS = 7.0D;
+    private static final double RADIUS = 9.0D;
 
     public ThrownSmokeBomb(EntityType<? extends ThrownSmokeBomb> type, Level level) {
         super(type, level);
@@ -45,12 +45,14 @@ public class ThrownSmokeBomb extends BattleProjectile {
         level.playSound(null, at.x, at.y, at.z, SoundEvents.FIRE_EXTINGUISH, SoundSource.PLAYERS, 1.0F, 0.8F);
 
         if (getOwner() instanceof ServerPlayer thrower) {
-            thrower.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, 120, 0, false, false, true));
-            thrower.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 120, 1, false, false, true));
+            thrower.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, 160, 0, false, false, true));
+            thrower.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 160, 1, false, false, true));
         }
         for (ServerPlayer target : opponentsNear(level, at, RADIUS)) {
-            target.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 80, 0, false, false, true));
-            target.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 80, 0, false, false, true));
+            target.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 110, 0, false, false, true));
+            target.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 110, 0, false, false, true));
+            // The actual flashbang: three seconds where they genuinely cannot see.
+            io.github.creepydutchboy.covebattle.net.CBNetwork.sendFlash(target, 60);
         }
     }
 }

@@ -13,8 +13,10 @@
   "block.covebattle.arena_bound_marker": "Arena Bound Marker",
   "item.covebattle.storm_egg": "Storm Egg",
   "item.covebattle.smoke_bomb": "Smoke Bomb",
-  "item.covebattle.war_horn": "War Horn",
   "item.covebattle.siphon_flask": "Siphon Flask",
   "item.covebattle.coveslayer": "Coveslayer",
-  "item.covebattle.ghost_boots": "Ghost Boots"
+  "item.covebattle.ghost_boots": "Ghost Boots",
+  "item.covebattle.tidal_surge": "Tidal Surge",
+  "item.covebattle.mirage_totem": "Mirage Totem",
+  "item.covebattle.tide_rod": "Tide Rod"
 }

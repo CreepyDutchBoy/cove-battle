@@ -103,7 +103,7 @@ public record Mutators(
 
     /** The default: everything Classic has, plus the custom gear and the modern finish. */
     public static Mutators remastered() {
-        return new Mutators(15, 90, 12, 15, 30, 4, 2,
+        return new Mutators(15, 120, 12, 15, 30, 4, 2,
                 1.0f, 10.0f, 1.0f, 1.0f, 1.0f,
                 true, true, true, true, false, true, true, true);
     }

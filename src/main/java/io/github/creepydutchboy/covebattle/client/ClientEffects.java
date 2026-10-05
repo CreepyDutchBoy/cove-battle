@@ -21,6 +21,8 @@ public final class ClientEffects {
 
     private static final ResourceLocation ELIMINATED =
             ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "shaders/post/cove_eliminated.json");
+    private static final ResourceLocation FLASH =
+            ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "shaders/post/cove_flash.json");
     private static final ResourceLocation SHOWDOWN =
             ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "shaders/post/cove_showdown.json");
 
@@ -44,7 +46,9 @@ public final class ClientEffects {
         }
 
         ResourceLocation wanted = null;
-        if (minecraft.player.isSpectator()) {
+        if (FlashOverlay.active()) {
+            wanted = FLASH;
+        } else if (minecraft.player.isSpectator()) {
             wanted = ELIMINATED;
         } else {
             WorldBorder border = minecraft.level.getWorldBorder();

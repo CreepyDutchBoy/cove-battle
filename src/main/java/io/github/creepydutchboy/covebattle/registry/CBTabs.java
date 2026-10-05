@@ -35,14 +35,16 @@ public final class CBTabs {
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.covebattle.items"))
                     .withTabsBefore(MARKERS.getKey())
-                    .icon(() -> new ItemStack(CBItems.COVESLAYER.get()))
+                    .icon(() -> new ItemStack(CBItems.MIRAGE_TOTEM.get()))
                     .displayItems((parameters, output) -> {
-                        output.accept(CBItems.COVESLAYER.get());
-                        output.accept(CBItems.GHOST_BOOTS.get());
+                        // Coveslayer is deliberately absent: disabled until it is retuned.
+                        output.accept(CBItems.MIRAGE_TOTEM.get());
+                        output.accept(CBItems.TIDAL_SURGE.get());
                         output.accept(CBItems.STORM_EGG.get());
                         output.accept(CBItems.SMOKE_BOMB.get());
-                        output.accept(CBItems.WAR_HORN.get());
                         output.accept(CBItems.SIPHON_FLASK.get());
+                        output.accept(CBItems.TIDE_ROD.get());
+                        output.accept(CBItems.GHOST_BOOTS.get());
                     })
                     .build());
 

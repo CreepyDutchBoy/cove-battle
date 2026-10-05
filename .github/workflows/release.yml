@@ -48,3 +48,4 @@ jobs:
             build/dist/covebattle.jar
             build/dist/covebattle.jar.sha256
             build/dist/covebattle.update.json
+            build/dist/covebattle-installer.jar

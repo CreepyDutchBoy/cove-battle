@@ -17,6 +17,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -109,6 +110,7 @@ public final class CoveBattleClientEvents {
     @SubscribeEvent
     static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+        FlashOverlay.tick();
         ClientEffects.tick(minecraft);
 
         // Hosting drops you into the lobby rather than into the world.
@@ -116,6 +118,14 @@ public final class CoveBattleClientEvents {
             openLobbyWhenReady = false;
             minecraft.setScreen(new CoveLobbyScreen(null));
         }
+    }
+
+    /** The white wash sits on top of the HUD, so being flashed hides the HUD too. */
+    @SubscribeEvent
+    static void onRenderGui(RenderGuiEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        FlashOverlay.render(event.getGuiGraphics(), event.getPartialTick().getGameTimeDeltaPartialTick(false),
+                minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
     }
 
     @SubscribeEvent
@@ -126,6 +136,7 @@ public final class CoveBattleClientEvents {
     @SubscribeEvent
     static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientEffects.clear(Minecraft.getInstance());
+        FlashOverlay.clear();
         ClientLobby.reset();
         ClientRules.reset();
         openLobbyWhenReady = false;

@@ -125,7 +125,18 @@ public final class ContainerRegistry {
     private boolean fill(ServerLevel level, Slot slot, RandomSource random, Mutators rules) {
         BlockEntity be = level.getBlockEntity(slot.pos());
         if (!(be instanceof Container container)) return false;
-        BattleLoot.fill(level, container, slot.centre(), random, rules);
+
+        // A double chest reads as one container to a player, so the pair gets three times the loot:
+        // each half rolls 1.5x and the two halves together come to 3x.
+        float scale = 1.0f;
+        var state = level.getBlockState(slot.pos());
+        if (state.hasProperty(net.minecraft.world.level.block.ChestBlock.TYPE)
+                && state.getValue(net.minecraft.world.level.block.ChestBlock.TYPE)
+                        != net.minecraft.world.level.block.state.properties.ChestType.SINGLE) {
+            scale = 1.5f;
+        }
+
+        BattleLoot.fill(level, container, slot.centre(), random, rules, scale);
         return true;
     }
 

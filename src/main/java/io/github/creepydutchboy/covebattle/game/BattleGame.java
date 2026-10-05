@@ -54,7 +54,11 @@ public final class BattleGame {
     private static final int TIE_HOLD_SECONDS = 30;
     /** How long a match waits when one side empties out, before awarding it to the side still there. */
     private static final int EMPTY_SIDE_GRACE_TICKS = 20 * 20;
-    private static final double BORDER_STEP_FACTOR = 0.75D;
+    /**
+     * How much of its radius the border keeps per step. 0.95 rather than 0.75 means it closes at
+     * roughly a fifth of the old rate, which is what the pacing wanted.
+     */
+    private static final double BORDER_STEP_FACTOR = 0.95D;
 
     private final MinecraftServer server;
     private final BattleHud hud = new BattleHud();
@@ -82,6 +86,8 @@ public final class BattleGame {
     private ContainerRegistry registry;
     @Nullable
     private ArenaLayout layout;
+    @Nullable
+    private io.github.creepydutchboy.covebattle.world.ArenaSnapshot snapshot;
 
     private double borderRadius;
     private int borderStepTicks;
@@ -169,6 +175,11 @@ public final class BattleGame {
         return sideWins;
     }
 
+    /** Blocks covered by the arena snapshot, or 0 when nothing has been captured. */
+    public long snapshotVolume() {
+        return snapshot == null ? 0L : snapshot.volume();
+    }
+
     public double borderRadius() {
         return borderRadius;
     }
@@ -229,6 +240,13 @@ public final class BattleGame {
         layout = scan.layout();
         registry = scan.containers();
 
+        // Read the arena once so every round can be handed back exactly as it was found.
+        ServerLevel world = level();
+        if (world != null) {
+            snapshot = io.github.creepydutchboy.covebattle.world.ArenaSnapshot.capture(
+                    world, layout.centre(), Math.min(96, layout.radius()), 12, 36);
+        }
+
         if (registry.size() == 0) {
             Announcer.broadcast(server, Announcer.prefix().append(Component.literal(
                             "No chests or barrels found in the arena — loot will be empty. Place an Arena Centre Marker, or fix the centre in the config.")
@@ -266,6 +284,8 @@ public final class BattleGame {
         }
         ServerLevel level = level();
         if (registry != null && level != null) registry.clearAll(level);
+        if (level != null && snapshot != null) snapshot.restore(level);
+        io.github.creepydutchboy.covebattle.mirage.MirageManager.clear();
         clearTeams();
         toLobby();
     }
@@ -280,6 +300,7 @@ public final class BattleGame {
         sideWins.clear();
         registry = null;
         layout = null;
+        snapshot = null;
         round = 0;
     }
 
@@ -524,6 +545,16 @@ public final class BattleGame {
         border.setDamagePerBlock(0.8D);
         border.setDamageSafeZone(1.0D);
         borderRadius = playRadius();
+
+        // Put the arena back exactly as it was before this round is stocked.
+        ServerLevel world = level();
+        if (world != null && snapshot != null) {
+            snapshot.restore(world);
+        }
+        if (world != null) {
+            io.github.creepydutchboy.covebattle.world.ArenaSnapshot.extinguish(world, centre(), Math.min(48, playRadius()));
+        }
+        io.github.creepydutchboy.covebattle.mirage.MirageManager.clear();
 
         int filled = registry == null ? 0 : registry.fillAll(level(), level().random, rules);
         CoveBattle.LOGGER.info("Round {} starting: {} containers stocked, mode {}", round, filled, mode);
@@ -845,6 +876,13 @@ public final class BattleGame {
                 CoveBattleConfig.centreTierRadius);
         layout = scan.layout();
         registry = scan.containers();
+
+        // Read the arena once so every round can be handed back exactly as it was found.
+        ServerLevel world = level();
+        if (world != null) {
+            snapshot = io.github.creepydutchboy.covebattle.world.ArenaSnapshot.capture(
+                    world, layout.centre(), Math.min(96, layout.radius()), 12, 36);
+        }
         return registry.size();
     }
 

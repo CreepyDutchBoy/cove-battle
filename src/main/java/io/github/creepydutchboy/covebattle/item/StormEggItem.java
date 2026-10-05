@@ -29,9 +29,9 @@ public class StormEggItem extends ThrowableBattleItem {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.literal("Throw it. Lightning lands where it does.").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal("  Damage ").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.literal("7.0 (3.5 hearts), lightning type").withStyle(ChatFormatting.GOLD)));
+                .append(Component.literal("11.0 (5.5 hearts), lightning type").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  Splash radius ").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.literal("3.0 blocks").withStyle(ChatFormatting.GOLD)));
+                .append(Component.literal("4.0 blocks").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  Cooldown ").withStyle(ChatFormatting.DARK_GRAY)
                 .append(Component.literal("3.0s, scaled by the ability cooldown mutator").withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.literal("  Hits ").withStyle(ChatFormatting.DARK_GRAY)

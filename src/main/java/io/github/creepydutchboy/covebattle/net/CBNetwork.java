@@ -29,6 +29,7 @@ public final class CBNetwork {
         registrar.playToServer(SetRulesPayload.TYPE, SetRulesPayload.STREAM_CODEC, CBNetwork::onSetRules);
         registrar.playToClient(SyncLobbyPayload.TYPE, SyncLobbyPayload.STREAM_CODEC, CBNetwork::onSyncLobby);
         registrar.playToServer(LobbyActionPayload.TYPE, LobbyActionPayload.STREAM_CODEC, CBNetwork::onLobbyAction);
+        registrar.playToClient(FlashPayload.TYPE, FlashPayload.STREAM_CODEC, CBNetwork::onFlash);
     }
 
     public static void sendRules(ServerPlayer player, MatchMode mode, Mutators mutators) {
@@ -46,6 +47,20 @@ public final class CBNetwork {
             CoveBattle.LOGGER.warn("Could not send the lobby to {}: {}",
                     player.getGameProfile().getName(), e.toString());
         }
+    }
+
+    /** Blinds one player's screen for a while. */
+    public static void sendFlash(ServerPlayer player, int ticks) {
+        try {
+            PacketDistributor.sendToPlayer(player, new FlashPayload(ticks));
+        } catch (Exception e) {
+            CoveBattle.LOGGER.debug("Could not flash {}: {}", player.getGameProfile().getName(), e.toString());
+        }
+    }
+
+    private static void onFlash(FlashPayload payload, IPayloadContext context) {
+        context.enqueueWork(() ->
+                io.github.creepydutchboy.covebattle.client.FlashOverlay.start(payload.ticks()));
     }
 
     private static void onSyncLobby(SyncLobbyPayload payload, IPayloadContext context) {

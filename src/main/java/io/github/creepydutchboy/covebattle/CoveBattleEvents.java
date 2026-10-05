@@ -57,95 +57,65 @@ public final class CoveBattleEvents {
     static void onServerTick(ServerTickEvent.Post event) {
         BattleGame game = BattleManager.game();
         if (game != null) game.tick();
+        io.github.creepydutchboy.covebattle.mirage.MirageManager.tick(event.getServer());
+        campfireHealing(event.getServer());
+        ghostBootsSpeed(event.getServer());
     }
 
-    /**
-     * Fires on {@code /reload} as well as on join, which is how the start prompt reappears after a
-     * reload without the mod needing to be reloaded itself.
-     */
-    @SubscribeEvent
-    static void onDatapackSync(OnDatapackSyncEvent event) {
-        if (event.getPlayer() != null) return;
-        if (event.getPlayerList().getPlayers().isEmpty()) return;
-        Announcer.postLobbyPrompt(event.getPlayerList().getServer());
-    }
+    private static final net.minecraft.resources.ResourceLocation GHOST_SPEED =
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "ghost_boots_speed");
 
-    /** Fall damage and the damage multiplier are mutators, so they live on the damage event. */
-    @SubscribeEvent
-    static void onIncomingDamage(LivingIncomingDamageEvent event) {
-        BattleGame game = BattleManager.game();
-        if (game == null || !game.phase().isLive()) return;
-        if (!(event.getEntity() instanceof ServerPlayer)) return;
-
-        var rules = game.rules();
-        if (!rules.fallDamage() && event.getSource().is(DamageTypeTags.IS_FALL)) {
-            event.setCanceled(true);
-            return;
-        }
-        if (Math.abs(rules.damageDealt() - 1.0f) > 0.01f
-                && event.getSource().getEntity() instanceof ServerPlayer) {
-            event.setAmount(event.getAmount() * rules.damageDealt());
-        }
-    }
-
-    @SubscribeEvent
-    static void onDeath(LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        BattleGame game = BattleManager.game();
-        if (game == null) return;
-
-        ServerPlayer killer = event.getSource().getEntity() instanceof ServerPlayer sp ? sp : null;
-        if (game.onDeath(player, killer)) {
-            // The game turns a death into an elimination, so the vanilla death screen never appears.
-            event.setCanceled(true);
-        }
-    }
-
-    /**
-     * Adventure mode is held by reacting to the change rather than overwriting every player every
-     * tick. Creative and spectator are left alone so building and moderating still work.
-     */
-    @SubscribeEvent
-    static void onGameModeChange(PlayerEvent.PlayerChangeGameModeEvent event) {
-        if (!CoveBattleConfig.forceAdventure) return;
-        if (event.getNewGameMode() != net.minecraft.world.level.GameType.SURVIVAL) return;
-        if (!(event.getEntity() instanceof ServerPlayer)) return;
-        event.setNewGameMode(net.minecraft.world.level.GameType.ADVENTURE);
-    }
-
-    @SubscribeEvent
-    static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (event.getLevel().isClientSide()) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        BattleGame game = BattleManager.game();
-        if (game != null) game.onContainerOpened(player, event.getPos());
-    }
-
-    @SubscribeEvent
-    static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        RulesState.syncTo(player);
-        LobbyState.onPlayerJoin(player);
-
-        BattleGame game = BattleManager.game();
-        if (game != null) game.onPlayerJoin(player);
-
-        if (!CoveBattleConfig.notifyInChat) return;
-        UpdateOutcome outcome = UpdateBridge.last();
-        if (!outcome.isActionable()) return;
-
-        switch (outcome.status()) {
-            case UPDATE_INSTALLED -> player.sendSystemMessage(prefix()
-                    .append(Component.literal("updated to " + outcome.version() + " — restart the game to apply.")
-                            .withStyle(ChatFormatting.GREEN)));
-            case UPDATE_AVAILABLE -> player.sendSystemMessage(prefix()
-                    .append(Component.literal("version " + outcome.version() + " is available.")
-                            .withStyle(ChatFormatting.YELLOW)));
-            default -> {
-                // nothing worth interrupting the player for
+    /** Ghost Boots make you quicker while they are on, and only while they are on. */
+    private static void ghostBootsSpeed(net.minecraft.server.MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            var speed = player.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+            if (speed == null) continue;
+            boolean worn = player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET)
+                    .is(io.github.creepydutchboy.covebattle.registry.CBItems.GHOST_BOOTS.get());
+            boolean applied = speed.getModifier(GHOST_SPEED) != null;
+            if (worn && !applied) {
+                speed.addTransientModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(
+                        GHOST_SPEED, 0.12D,
+                        net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+            } else if (!worn && applied) {
+                speed.removeModifier(GHOST_SPEED);
             }
         }
+    }
+
+    /** A lit campfire you are standing near knits you back together, slowly. */
+    private static int campfireTicks;
+
+    private static void campfireHealing(net.minecraft.server.MinecraftServer server) {
+        if (++campfireTicks < 40) return;
+        campfireTicks = 0;
+
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.isSpectator() || player.getHealth() >= player.getMaxHealth()) continue;
+            if (nearLitCampfire(player)) {
+                player.heal(1.0F);
+                player.serverLevel().sendParticles(net.minecraft.core.particles.ParticleTypes.HEART,
+                        player.getX(), player.getY() + 1.8, player.getZ(), 1, 0.3, 0.2, 0.3, 0.01);
+            }
+        }
+    }
+
+    private static boolean nearLitCampfire(ServerPlayer player) {
+        net.minecraft.core.BlockPos origin = player.blockPosition();
+        net.minecraft.core.BlockPos.MutableBlockPos cursor = new net.minecraft.core.BlockPos.MutableBlockPos();
+        for (int x = -4; x <= 4; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -4; z <= 4; z++) {
+                    cursor.set(origin.getX() + x, origin.getY() + y, origin.getZ() + z);
+                    var state = player.level().getBlockState(cursor);
+                    if (state.getBlock() instanceof net.minecraft.world.level.block.CampfireBlock
+                            && state.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static MutableComponent prefix() {
