@@ -10,6 +10,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 
@@ -37,6 +38,17 @@ public final class CoveBattleClientEvents {
         } catch (Throwable t) {
             CoveBattle.LOGGER.error("Could not add the Cove Battle button to the title screen", t);
         }
+    }
+
+    /** Opens the mutator board in game. Client-side, so it needs no server round trip to show. */
+    @SubscribeEvent
+    static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+        event.getDispatcher().register(
+                net.minecraft.commands.Commands.literal("cbmutators").executes(ctx -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.tell(() -> minecraft.setScreen(new MutatorScreen(minecraft.screen)));
+                    return 1;
+                }));
     }
 
     @SubscribeEvent

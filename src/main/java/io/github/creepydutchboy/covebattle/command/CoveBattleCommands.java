@@ -2,12 +2,20 @@ package io.github.creepydutchboy.covebattle.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.creepydutchboy.covebattle.CoveBattle;
 import io.github.creepydutchboy.covebattle.CoveBattleConfig;
 import io.github.creepydutchboy.covebattle.UpdateBridge;
 import io.github.creepydutchboy.covebattle.game.Announcer;
 import io.github.creepydutchboy.covebattle.game.ArenaLayout;
+import io.github.creepydutchboy.covebattle.game.BattleBots;
 import io.github.creepydutchboy.covebattle.game.BattleMode;
+import io.github.creepydutchboy.covebattle.rules.MatchMode;
+import io.github.creepydutchboy.covebattle.rules.MutatorSpec;
+import io.github.creepydutchboy.covebattle.rules.Mutators;
+import io.github.creepydutchboy.covebattle.rules.RulesState;
 import io.github.creepydutchboy.covebattle.game.BattleGame;
 import io.github.creepydutchboy.covebattle.game.BattleManager;
 import io.github.creepydutchboy.covebattle.loot.BattleLoot;
@@ -19,6 +27,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -74,12 +83,157 @@ public final class CoveBattleCommands {
                                         .executes(ctx -> debugBorder(ctx.getSource(),
                                                 DoubleArgumentType.getDouble(ctx, "radius"))))))
 
+                .then(Commands.literal("mode")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> showMode(ctx.getSource()))
+                        .then(Commands.literal("classic").executes(ctx -> setMode(ctx.getSource(), MatchMode.CLASSIC)))
+                        .then(Commands.literal("remastered").executes(ctx -> setMode(ctx.getSource(), MatchMode.REMASTERED)))
+                        .then(Commands.literal("mutators").executes(ctx -> setMode(ctx.getSource(), MatchMode.MUTATORS))))
+
+                .then(Commands.literal("mutator")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> listMutators(ctx.getSource()))
+                        .then(Commands.literal("list").executes(ctx -> listMutators(ctx.getSource())))
+                        .then(Commands.literal("preset")
+                                .then(Commands.literal("classic").executes(ctx -> preset(ctx.getSource(), MatchMode.CLASSIC)))
+                                .then(Commands.literal("remastered").executes(ctx -> preset(ctx.getSource(), MatchMode.REMASTERED))))
+                        .then(Commands.literal("set")
+                                .then(Commands.argument("key", StringArgumentType.word())
+                                        .suggests(MUTATOR_KEYS)
+                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg())
+                                                .executes(ctx -> setMutator(ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "key"),
+                                                        (float) DoubleArgumentType.getDouble(ctx, "value")))))))
+
+                .then(Commands.literal("bot")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("add")
+                                .executes(ctx -> addBots(ctx.getSource(), 1))
+                                .then(Commands.argument("count", IntegerArgumentType.integer(1, 32))
+                                        .executes(ctx -> addBots(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "count")))))
+                        .then(Commands.literal("kill")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(ctx -> killBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))))
+                        .then(Commands.literal("list").executes(ctx -> listBots(ctx.getSource())))
+                        .then(Commands.literal("clear").executes(ctx -> clearBots(ctx.getSource()))))
+
                 .then(Commands.literal("update")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("check")
                                 .executes(ctx -> update(ctx.getSource(), false)))
                         .then(Commands.literal("now")
                                 .executes(ctx -> update(ctx.getSource(), true)))));
+    }
+
+    private static final SuggestionProvider<CommandSourceStack> MUTATOR_KEYS = (ctx, builder) -> {
+        for (String key : MutatorSpec.keys()) builder.suggest(key);
+        return builder.buildFuture();
+    };
+
+    // ---- modes and mutators ----
+
+    private static int showMode(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal("Mode: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(RulesState.mode().label()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal("  " + RulesState.mode().blurb()).withStyle(ChatFormatting.DARK_GRAY)), false);
+        return 1;
+    }
+
+    private static int setMode(CommandSourceStack source, MatchMode mode) {
+        RulesState.setMode(source.getServer(), mode);
+        source.sendSuccess(() -> Component.literal("Mode set to " + mode.label() + ".").withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int preset(CommandSourceStack source, MatchMode from) {
+        RulesState.copyPresetIntoCustom(source.getServer(), from);
+        source.sendSuccess(() -> Component.literal("Mutators reset to the " + from.label() + " preset.")
+                .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int listMutators(CommandSourceStack source) {
+        Mutators active = RulesState.active();
+        Mutators custom = RulesState.custom();
+        source.sendSuccess(() -> Component.literal("Mode " + RulesState.mode().label()
+                + "  (editable set shown in brackets)").withStyle(ChatFormatting.GOLD), false);
+        for (MutatorSpec spec : MutatorSpec.ALL) {
+            String live = spec.format(active.value(spec.key()));
+            String edit = spec.format(custom.value(spec.key()));
+            source.sendSuccess(() -> Component.literal("  " + spec.key()).withStyle(ChatFormatting.YELLOW)
+                    .append(Component.literal(" = " + live).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal(live.equals(edit) ? "" : "  [" + edit + "]").withStyle(ChatFormatting.DARK_GRAY))
+                    .append(Component.literal("   " + spec.label()).withStyle(ChatFormatting.GRAY)), false);
+        }
+        return 1;
+    }
+
+    private static int setMutator(CommandSourceStack source, String key, float value) {
+        MutatorSpec spec = MutatorSpec.byKey(key);
+        if (spec == null) {
+            source.sendFailure(Component.literal("Unknown mutator \"" + key + "\". Try /covebattle mutator list."));
+            return 0;
+        }
+        Mutators updated = RulesState.custom().with(spec.key(), value);
+        RulesState.setCustom(source.getServer(), updated);
+        String shown = spec.format(updated.value(spec.key()));
+        source.sendSuccess(() -> Component.literal(spec.label() + " set to " + shown).withStyle(ChatFormatting.GREEN)
+                .append(Component.literal(RulesState.mode() == MatchMode.MUTATORS ? "" : "  (switch to Mutators mode to use it)")
+                        .withStyle(ChatFormatting.GRAY)), false);
+        return 1;
+    }
+
+    // ---- test bots ----
+
+    private static int addBots(CommandSourceStack source, int count) {
+        ServerLevel level = source.getServer().overworld();
+        int before = BattleBots.count();
+        for (int i = 0; i < count; i++) {
+            BattleBots.spawn(level, "CoveBot" + (before + i + 1));
+        }
+        source.sendSuccess(() -> Component.literal("Spawned " + count + " test bot(s); " + BattleBots.count() + " total.")
+                .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int listBots(CommandSourceStack source) {
+        if (BattleBots.count() == 0) {
+            source.sendSuccess(() -> Component.literal("No test bots.").withStyle(ChatFormatting.GRAY), false);
+            return 1;
+        }
+        for (ServerPlayer bot : BattleBots.all()) {
+            source.sendSuccess(() -> Component.literal("  " + bot.getGameProfile().getName()
+                    + "  health " + Math.round(bot.getHealth())
+                    + "  at " + bot.blockPosition().toShortString()).withStyle(ChatFormatting.GRAY), false);
+        }
+        return 1;
+    }
+
+    /**
+     * Eliminates a bot. NeoForge's FakePlayer ignores damage by design, so this calls the same
+     * elimination the death event would, which is the part worth testing: it marks the bot out and
+     * lets the game resolve the round.
+     */
+    private static int killBot(CommandSourceStack source, String name) {
+        BattleGame game = BattleManager.game();
+        for (ServerPlayer bot : BattleBots.all()) {
+            if (!bot.getGameProfile().getName().equalsIgnoreCase(name)) continue;
+            if (game == null || !game.onDeath(bot, null)) {
+                source.sendFailure(Component.literal(name + " is not in a live round."));
+                return 0;
+            }
+            source.sendSuccess(() -> Component.literal("Eliminated " + name + ".").withStyle(ChatFormatting.YELLOW), false);
+            return 1;
+        }
+        source.sendFailure(Component.literal("No bot called " + name));
+        return 0;
+    }
+
+    private static int clearBots(CommandSourceStack source) {
+        int n = BattleBots.count();
+        BattleBots.clear();
+        source.sendSuccess(() -> Component.literal("Removed " + n + " bot(s).").withStyle(ChatFormatting.GRAY), false);
+        return 1;
     }
 
     // ---- read-only ----

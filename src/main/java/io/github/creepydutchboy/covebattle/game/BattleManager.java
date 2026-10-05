@@ -21,7 +21,12 @@ public final class BattleManager {
     }
 
     public static void onServerStopping() {
-        if (game != null) game.reset();
+        try {
+            if (game != null) game.reset();
+        } catch (Exception e) {
+            // A server that failed to initialise has no level to tidy up; never make shutdown worse.
+            io.github.creepydutchboy.covebattle.CoveBattle.LOGGER.debug("Nothing to reset on shutdown: {}", e.toString());
+        }
         game = null;
     }
 

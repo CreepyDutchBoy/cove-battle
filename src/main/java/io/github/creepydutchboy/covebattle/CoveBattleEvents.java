@@ -4,16 +4,19 @@ import io.github.creepydutchboy.covebattle.command.CoveBattleCommands;
 import io.github.creepydutchboy.covebattle.game.Announcer;
 import io.github.creepydutchboy.covebattle.game.BattleGame;
 import io.github.creepydutchboy.covebattle.game.BattleManager;
+import io.github.creepydutchboy.covebattle.rules.RulesState;
 import io.github.creepydutchboy.covebattle.update.UpdateOutcome;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -35,6 +38,7 @@ public final class CoveBattleEvents {
     static void onServerStarted(ServerStartedEvent event) {
         CoveBattle.LOGGER.info("{} {} ready (Minecraft {}).",
                 CoveBattle.MOD_NAME, UpdateBridge.modVersion(), UpdateBridge.mcVersion());
+        RulesState.load(event.getServer().getServerDirectory().resolve("config"));
         BattleManager.onServerStarted(event.getServer());
     }
 
@@ -60,6 +64,24 @@ public final class CoveBattleEvents {
         Announcer.postLobbyPrompt(event.getPlayerList().getServer());
     }
 
+    /** Fall damage and the damage multiplier are mutators, so they live on the damage event. */
+    @SubscribeEvent
+    static void onIncomingDamage(LivingIncomingDamageEvent event) {
+        BattleGame game = BattleManager.game();
+        if (game == null || !game.phase().isLive()) return;
+        if (!(event.getEntity() instanceof ServerPlayer)) return;
+
+        var rules = game.rules();
+        if (!rules.fallDamage() && event.getSource().is(DamageTypeTags.IS_FALL)) {
+            event.setCanceled(true);
+            return;
+        }
+        if (Math.abs(rules.damageDealt() - 1.0f) > 0.01f
+                && event.getSource().getEntity() instanceof ServerPlayer) {
+            event.setAmount(event.getAmount() * rules.damageDealt());
+        }
+    }
+
     @SubscribeEvent
     static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -73,6 +95,18 @@ public final class CoveBattleEvents {
         }
     }
 
+    /**
+     * Adventure mode is held by reacting to the change rather than overwriting every player every
+     * tick. Creative and spectator are left alone so building and moderating still work.
+     */
+    @SubscribeEvent
+    static void onGameModeChange(PlayerEvent.PlayerChangeGameModeEvent event) {
+        if (!CoveBattleConfig.forceAdventure) return;
+        if (event.getNewGameMode() != net.minecraft.world.level.GameType.SURVIVAL) return;
+        if (!(event.getEntity() instanceof ServerPlayer)) return;
+        event.setNewGameMode(net.minecraft.world.level.GameType.ADVENTURE);
+    }
+
     @SubscribeEvent
     static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide()) return;
@@ -84,6 +118,8 @@ public final class CoveBattleEvents {
     @SubscribeEvent
     static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        RulesState.syncTo(player);
 
         BattleGame game = BattleManager.game();
         if (game != null) game.onPlayerJoin(player);

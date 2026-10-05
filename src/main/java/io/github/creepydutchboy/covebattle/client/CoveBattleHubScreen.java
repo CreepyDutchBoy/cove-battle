@@ -55,9 +55,14 @@ public class CoveBattleHubScreen extends Screen {
                 .bounds(centreX - 102, y + 52, 204, 20)
                 .build());
 
+        addRenderableWidget(Button.builder(Component.literal("Modes & Mutators"),
+                        button -> this.minecraft.setScreen(new MutatorScreen(this)))
+                .bounds(centreX - 102, y + 78, 204, 20)
+                .build());
+
         addRenderableWidget(Button.builder(Component.literal("Back"),
                         button -> this.minecraft.setScreen(parent))
-                .bounds(centreX - 102, y + 86, 204, 20)
+                .bounds(centreX - 102, y + 108, 204, 20)
                 .build());
     }
 
@@ -91,7 +96,7 @@ public class CoveBattleHubScreen extends Screen {
                 Component.literal("Legacy console Battle, remastered").withStyle(ChatFormatting.GRAY),
                 centreX, 42, 0xAAAAAA);
 
-        int bottom = Math.max(70, this.height / 4 + 8) + 112;
+        int bottom = Math.max(70, this.height / 4 + 8) + 134;
         graphics.drawCenteredString(this.font,
                 Component.literal("To host: play the map, then Esc → Open to LAN").withStyle(ChatFormatting.DARK_GRAY),
                 centreX, bottom, 0x888888);

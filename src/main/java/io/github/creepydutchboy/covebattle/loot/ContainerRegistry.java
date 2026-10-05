@@ -1,5 +1,6 @@
 package io.github.creepydutchboy.covebattle.loot;
 
+import io.github.creepydutchboy.covebattle.rules.Mutators;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -81,11 +82,11 @@ public final class ContainerRegistry {
     }
 
     /** Fills every known container. Used at the start of a round. */
-    public int fillAll(ServerLevel level, RandomSource random) {
+    public int fillAll(ServerLevel level, RandomSource random, Mutators rules) {
         looted.clear();
         int filled = 0;
         for (Slot slot : slots) {
-            if (fill(level, slot, random)) filled++;
+            if (fill(level, slot, random, rules)) filled++;
         }
         return filled;
     }
@@ -96,7 +97,7 @@ public final class ContainerRegistry {
      *
      * @return how many were refilled
      */
-    public int restock(ServerLevel level, int count, double avoidPlayersWithin, RandomSource random) {
+    public int restock(ServerLevel level, int count, double avoidPlayersWithin, RandomSource random, Mutators rules) {
         if (looted.isEmpty()) return 0;
 
         List<Slot> candidates = new ArrayList<>();
@@ -113,7 +114,7 @@ public final class ContainerRegistry {
         int refilled = 0;
         for (Slot slot : candidates) {
             if (refilled >= count) break;
-            if (fill(level, slot, random)) {
+            if (fill(level, slot, random, rules)) {
                 looted.remove(slot.pos());
                 refilled++;
             }
@@ -121,10 +122,10 @@ public final class ContainerRegistry {
         return refilled;
     }
 
-    private boolean fill(ServerLevel level, Slot slot, RandomSource random) {
+    private boolean fill(ServerLevel level, Slot slot, RandomSource random, Mutators rules) {
         BlockEntity be = level.getBlockEntity(slot.pos());
         if (!(be instanceof Container container)) return false;
-        BattleLoot.fill(level, container, slot.centre(), random);
+        BattleLoot.fill(level, container, slot.centre(), random, rules);
         return true;
     }
 

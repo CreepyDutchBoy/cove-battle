@@ -1,5 +1,6 @@
 package io.github.creepydutchboy.covebattle.item;
 
+import io.github.creepydutchboy.covebattle.rules.RulesState;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -30,6 +31,11 @@ public abstract class AbilityItem extends Item {
         this.cooldownTicks = cooldownTicks;
     }
 
+    /** Cooldowns move with the ability-cooldown mutator. */
+    protected int scaledCooldown() {
+        return Math.max(1, Math.round(cooldownTicks * RulesState.active().abilityCooldown()));
+    }
+
     /** @return true when the ability fired and the item should be spent */
     protected abstract boolean activate(ServerLevel level, ServerPlayer player);
 
@@ -40,7 +46,7 @@ public abstract class AbilityItem extends Item {
             if (!activate(serverLevel, serverPlayer)) {
                 return InteractionResultHolder.fail(stack);
             }
-            serverPlayer.getCooldowns().addCooldown(this, cooldownTicks);
+            serverPlayer.getCooldowns().addCooldown(this, scaledCooldown());
             if (!serverPlayer.isCreative()) stack.shrink(1);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());

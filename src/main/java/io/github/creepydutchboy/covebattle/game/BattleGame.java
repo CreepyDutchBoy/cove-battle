@@ -4,8 +4,12 @@ import io.github.creepydutchboy.covebattle.CoveBattle;
 import io.github.creepydutchboy.covebattle.CoveBattleConfig;
 import io.github.creepydutchboy.covebattle.block.MarkerKind;
 import io.github.creepydutchboy.covebattle.loot.ContainerRegistry;
+import io.github.creepydutchboy.covebattle.rules.MatchMode;
+import io.github.creepydutchboy.covebattle.rules.Mutators;
+import io.github.creepydutchboy.covebattle.rules.RulesState;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -14,6 +18,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.scores.PlayerTeam;
@@ -50,8 +57,16 @@ public final class BattleGame {
     private final MinecraftServer server;
     private final BattleHud hud = new BattleHud();
 
+    private static final ResourceLocation HEALTH_MODIFIER =
+            ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "mutator_health");
+    private static final ResourceLocation SPEED_MODIFIER =
+            ResourceLocation.fromNamespaceAndPath(CoveBattle.MODID, "mutator_speed");
+
     private GamePhase phase = GamePhase.LOBBY;
     private BattleMode mode = BattleMode.SOLO;
+    /** Snapshot taken at match start so sliders moved mid-match cannot destabilise a round. */
+    private Mutators rules = Mutators.remastered();
+    private MatchMode ruleMode = MatchMode.REMASTERED;
     private int phaseTicks;
     private int round;
 
@@ -89,6 +104,15 @@ public final class BattleGame {
         return mode;
     }
 
+    /** The rules this match is running under, or the live ones when idle. */
+    public Mutators rules() {
+        return phase == GamePhase.LOBBY ? RulesState.active() : rules;
+    }
+
+    public MatchMode ruleMode() {
+        return phase == GamePhase.LOBBY ? RulesState.mode() : ruleMode;
+    }
+
     public int round() {
         return round;
     }
@@ -103,6 +127,8 @@ public final class BattleGame {
         return layout;
     }
 
+    /** Null while the server is still coming up, or if it failed to initialise. */
+    @Nullable
     public ServerLevel level() {
         return server.overworld();
     }
@@ -159,6 +185,7 @@ public final class BattleGame {
             GameType gameMode = player.gameMode.getGameModeForPlayer();
             if (gameMode == GameType.SURVIVAL || gameMode == GameType.ADVENTURE) candidates.add(player);
         }
+        candidates.addAll(BattleBots.all());
         if (candidates.size() < CoveBattleConfig.minPlayers) {
             feedback.accept(Component.literal("Need at least " + CoveBattleConfig.minPlayers
                             + " player(s) in survival or adventure to start; found " + candidates.size() + ".")
@@ -172,6 +199,8 @@ public final class BattleGame {
         }
 
         mode = requestedMode;
+        rules = RulesState.active();
+        ruleMode = RulesState.mode();
         participants.clear();
         stats.clear();
         sides.clear();
@@ -208,7 +237,7 @@ public final class BattleGame {
 
         round = 0;
         Announcer.broadcast(server, Announcer.prefix().append(Component.literal(
-                        mode.label() + " match starting — best of " + (CoveBattleConfig.roundsToWin * 2 - 1)
+                        ruleMode.label() + " " + mode.label() + " match starting — best of " + rules.bestOf()
                         + " with " + candidates.size() + " player(s).")
                 .withStyle(ChatFormatting.YELLOW)));
         startRound();
@@ -224,12 +253,14 @@ public final class BattleGame {
         for (ServerPlayer player : onlineParticipants()) {
             player.setInvulnerable(false);
             player.removeEffect(MobEffects.GLOWING);
+            clearMutators(player);
             if (player.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
                 player.setGameMode(GameType.ADVENTURE);
                 sendToLobby(player);
             }
         }
-        if (registry != null) registry.clearAll(level());
+        ServerLevel level = level();
+        if (registry != null && level != null) registry.clearAll(level);
         clearTeams();
         toLobby();
     }
@@ -251,7 +282,6 @@ public final class BattleGame {
 
     public void tick() {
         hud.syncAudience(server);
-        enforceGameMode();
 
         switch (phase) {
             case LOBBY -> { /* nothing to drive */ }
@@ -265,12 +295,14 @@ public final class BattleGame {
     }
 
     private void tickGrace() {
-        int total = CoveBattleConfig.graceSeconds * 20;
+        int total = rules.graceTicks();
         int remaining = total - phaseTicks;
 
         List<ServerPlayer> players = onlineParticipants();
         for (ServerPlayer player : players) {
             holdAtSpawn(player);
+        }
+        for (ServerPlayer player : connectedParticipants()) {
             BattleHud.actionBar(player, Component.literal("Released in " + Math.max(0, (remaining + 19) / 20) + "s")
                     .withStyle(ChatFormatting.YELLOW));
         }
@@ -281,7 +313,7 @@ public final class BattleGame {
         int second = (remaining + 19) / 20;
         if (second <= 5 && second >= 1 && second != lastPingSecond) {
             lastPingSecond = second;
-            for (ServerPlayer player : players) {
+            for (ServerPlayer player : connectedParticipants()) {
                 BattleHud.title(player, Component.literal(String.valueOf(second)).withStyle(ChatFormatting.GOLD),
                         Component.empty(), 0, 15, 5);
                 BattleHud.sound(player, SoundEvents.NOTE_BLOCK_HAT.value(), 1f, 1.2f);
@@ -304,7 +336,7 @@ public final class BattleGame {
     }
 
     private void tickFight() {
-        int total = CoveBattleConfig.matchSeconds * 20;
+        int total = rules.matchTicks();
         int remaining = Math.max(0, total - phaseTicks);
 
         hud.setBar(Component.literal("Round " + round + "  ").withStyle(ChatFormatting.RED)
@@ -318,16 +350,17 @@ public final class BattleGame {
         if (second > 0 && second % 30 == 0 && second != lastPingSecond) {
             lastPingSecond = second;
             pingUntilTick = phaseTicks + 60;
-            for (ServerPlayer player : onlineParticipants()) {
+            for (ServerPlayer player : connectedParticipants()) {
                 BattleHud.sound(player, SoundEvents.NOTE_BLOCK_PLING.value(), 0.7f, 1.6f);
             }
         }
 
         boolean showTimer = phaseTicks <= pingUntilTick;
-        for (ServerPlayer player : onlineAlive()) {
+        for (ServerPlayer player : connectedAlive()) {
             BattleHud.actionBar(player, showTimer ? timerLine(remaining) : statusLine(player));
         }
 
+        tickHunger();
         tickRestock();
         if (checkRoundOver()) return;
         if (remaining <= 0) beginShowdown();
@@ -341,6 +374,15 @@ public final class BattleGame {
 
         WorldBorder border = level().getWorldBorder();
         borderRadius = playRadius();
+        if (!rules.closingBorder()) {
+            for (ServerPlayer player : connectedParticipants()) {
+                BattleHud.title(player, Component.literal("SHOWDOWN").withStyle(ChatFormatting.LIGHT_PURPLE),
+                        Component.literal("Everyone is marked").withStyle(ChatFormatting.GRAY), 5, 40, 10);
+            }
+            Announcer.broadcast(server, Announcer.prefix().append(Component
+                    .literal("Showdown — everyone is marked.").withStyle(ChatFormatting.LIGHT_PURPLE)));
+            return;
+        }
         border.setCenter(centre().getX() + 0.5, centre().getZ() + 0.5);
         border.setSize(borderRadius * 2);
         border.setWarningBlocks(8);
@@ -348,7 +390,7 @@ public final class BattleGame {
         border.setDamagePerBlock(0.8D);
         border.setDamageSafeZone(1.0D);
 
-        for (ServerPlayer player : onlineParticipants()) {
+        for (ServerPlayer player : connectedParticipants()) {
             BattleHud.title(player, Component.literal("SHOWDOWN").withStyle(ChatFormatting.LIGHT_PURPLE),
                     Component.literal("The border is closing").withStyle(ChatFormatting.GRAY), 5, 40, 10);
             BattleHud.sound(player, SoundEvents.WITHER_SPAWN, 0.7f, 1.4f);
@@ -360,28 +402,42 @@ public final class BattleGame {
     private void tickShowdown() {
         WorldBorder border = level().getWorldBorder();
 
-        if (CoveBattleConfig.showdownGlow && phaseTicks % 40 == 0) {
+        if (rules.showdownGlow() && phaseTicks % 40 == 0) {
             for (ServerPlayer player : onlineAlive()) {
                 player.addEffect(new MobEffectInstance(MobEffects.GLOWING, 60, 0, false, false, false));
             }
         }
 
+        if (!rules.closingBorder()) {
+            // Classic: no shrinking border. Glowing marks the endgame and the tie clock ends it.
+            hud.setBar(Component.literal("Showdown — last one standing").withStyle(ChatFormatting.LIGHT_PURPLE),
+                    1f, BossEvent.BossBarColor.PURPLE);
+            for (ServerPlayer player : onlineAlive()) BattleHud.actionBar(player, statusLine(player));
+            tickRestock();
+            if (checkRoundOver()) return;
+            tieTicks++;
+            if (tieTicks >= TIE_HOLD_SECONDS * 4 * 20) {
+                endRound(null, "Nobody fell — the round is a tie and scores nothing.");
+            }
+            return;
+        }
+
         borderStepTicks++;
-        if (borderStepTicks >= CoveBattleConfig.borderStepSeconds * 20 && borderRadius > CoveBattleConfig.minRadius) {
+        if (borderStepTicks >= rules.borderStepSeconds() * 20 && borderRadius > rules.minRadius()) {
             borderStepTicks = 0;
-            double next = Math.max(CoveBattleConfig.minRadius, borderRadius * BORDER_STEP_FACTOR);
-            border.lerpSizeBetween(borderRadius * 2, next * 2, CoveBattleConfig.borderStepSeconds * 1000L);
+            double next = Math.max(rules.minRadius(), borderRadius * BORDER_STEP_FACTOR);
+            border.lerpSizeBetween(borderRadius * 2, next * 2, rules.borderStepSeconds() * 1000L);
             borderRadius = next;
         }
 
-        boolean atFloor = borderRadius <= CoveBattleConfig.minRadius + 0.01D;
-        float progress = (float) ((borderRadius - CoveBattleConfig.minRadius)
-                / Math.max(1.0D, playRadius() - CoveBattleConfig.minRadius));
+        boolean atFloor = borderRadius <= rules.minRadius() + 0.01D;
+        float progress = (float) ((borderRadius - rules.minRadius())
+                / Math.max(1.0D, playRadius() - rules.minRadius()));
         hud.setBar(Component.literal("Showdown — border ").withStyle(ChatFormatting.LIGHT_PURPLE)
                         .append(Component.literal(Math.round(borderRadius) + " blocks").withStyle(ChatFormatting.WHITE)),
                 atFloor ? 0f : progress, BossEvent.BossBarColor.PURPLE);
 
-        for (ServerPlayer player : onlineAlive()) {
+        for (ServerPlayer player : connectedAlive()) {
             BattleHud.actionBar(player, statusLine(player));
         }
 
@@ -396,14 +452,22 @@ public final class BattleGame {
         }
     }
 
+    /** Keeps the food bar pinned when the hunger mutator is off. */
+    private void tickHunger() {
+        if (rules.hunger()) return;
+        for (ServerPlayer player : onlineAlive()) {
+            if (player.getFoodData().getFoodLevel() < 20) player.getFoodData().setFoodLevel(20);
+        }
+    }
+
     private void tickRestock() {
         if (registry == null) return;
         restockTicks++;
-        if (restockTicks < CoveBattleConfig.restockSeconds * 20) return;
+        if (restockTicks < rules.restockSeconds() * 20) return;
         restockTicks = 0;
-        int refilled = registry.restock(level(), CoveBattleConfig.restockCount, 6.0D, level().random);
+        int refilled = registry.restock(level(), rules.restockCount(), 6.0D, level().random, rules);
         if (refilled > 0) {
-            for (ServerPlayer player : onlineAlive()) {
+            for (ServerPlayer player : connectedAlive()) {
                 BattleHud.sound(player, SoundEvents.CHEST_OPEN, 0.4f, 1.6f);
             }
             Announcer.broadcast(server, Announcer.prefix().append(Component
@@ -418,7 +482,7 @@ public final class BattleGame {
                 (float) remaining / total, BossEvent.BossBarColor.WHITE);
         if (remaining > 0) return;
 
-        if (roundWinnerSide != null && sideWins.getOrDefault(roundWinnerSide, 0) >= CoveBattleConfig.roundsToWin) {
+        if (roundWinnerSide != null && sideWins.getOrDefault(roundWinnerSide, 0) >= rules.roundsToWin()) {
             endMatch();
         } else {
             startRound();
@@ -454,14 +518,14 @@ public final class BattleGame {
         border.setDamageSafeZone(1.0D);
         borderRadius = playRadius();
 
-        int filled = registry == null ? 0 : registry.fillAll(level(), level().random);
+        int filled = registry == null ? 0 : registry.fillAll(level(), level().random, rules);
         CoveBattle.LOGGER.info("Round {} starting: {} containers stocked, mode {}", round, filled, mode);
 
         for (ServerPlayer player : onlineParticipants()) {
             resetPlayer(player);
             placeAtSpawn(player);
             BattleHud.title(player, Component.literal("ROUND " + round).withStyle(ChatFormatting.GOLD),
-                    Component.literal(mode.label() + " — best of " + (CoveBattleConfig.roundsToWin * 2 - 1))
+                    Component.literal(mode.label() + " — best of " + rules.bestOf())
                             .withStyle(ChatFormatting.GRAY), 5, 30, 10);
         }
         updateSidebar();
@@ -518,6 +582,7 @@ public final class BattleGame {
         for (ServerPlayer player : onlineParticipants()) {
             player.removeEffect(MobEffects.GLOWING);
             player.setInvulnerable(false);
+            clearMutators(player);
             if (player.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
                 player.setGameMode(GameType.ADVENTURE);
             }
@@ -533,11 +598,14 @@ public final class BattleGame {
         eliminated.clear();
         roundWinnerSide = null;
 
-        WorldBorder border = level().getWorldBorder();
-        border.setSize(VANILLA_BORDER_SIZE);
-        border.setDamagePerBlock(0.2D);
-        border.setWarningBlocks(5);
-        borderRadius = VANILLA_BORDER_SIZE / 2;
+        ServerLevel level = level();
+        if (level != null) {
+            WorldBorder border = level.getWorldBorder();
+            border.setSize(VANILLA_BORDER_SIZE);
+            border.setDamagePerBlock(0.2D);
+            border.setWarningBlocks(5);
+            borderRadius = VANILLA_BORDER_SIZE / 2;
+        }
 
         hud.hideBar();
         BattleHud.hideSidebar(server);
@@ -605,7 +673,7 @@ public final class BattleGame {
         PlayerTeam playerTeam = existing != null ? existing : scoreboard.addPlayerTeam(name);
         playerTeam.setDisplayName(Component.literal(display));
         playerTeam.setColor(colour);
-        playerTeam.setAllowFriendlyFire(false);
+        playerTeam.setAllowFriendlyFire(rules.friendlyFire());
         playerTeam.setSeeFriendlyInvisibles(true);
         return playerTeam;
     }
@@ -642,7 +710,7 @@ public final class BattleGame {
         player.setHealth(player.getMaxHealth());
         player.removeAllEffects();
         player.getInventory().clearContent();
-        player.setGameMode(GameType.SPECTATOR);
+        if (!BattleBots.isBot(player.getUUID())) player.setGameMode(GameType.SPECTATOR);
 
         if (killer != null && !killer.getUUID().equals(player.getUUID())) {
             PlayerStats ks = stats.get(killer.getUUID());
@@ -707,22 +775,44 @@ public final class BattleGame {
     /** Stocks every known container without starting a match. */
     public int debugFill() {
         if (registry == null) debugRescan();
-        return registry == null ? 0 : registry.fillAll(level(), level().random);
+        return registry == null ? 0 : registry.fillAll(level(), level().random, RulesState.active());
     }
 
     // ------------------------------------------------------------------ helpers
 
-    private void enforceGameMode() {
-        if (!CoveBattleConfig.forceAdventure) return;
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Creative and spectator are left alone so building and moderating still work.
-            if (player.gameMode.getGameModeForPlayer() == GameType.SURVIVAL) {
-                player.setGameMode(GameType.ADVENTURE);
+    /** Health and speed are applied as real attribute modifiers rather than potion effects. */
+    private void applyMutators(ServerPlayer player) {
+        AttributeInstance health = player.getAttribute(Attributes.MAX_HEALTH);
+        if (health != null) {
+            health.removeModifier(HEALTH_MODIFIER);
+            double delta = rules.maxHealthHearts() * 2.0D - 20.0D;
+            if (Math.abs(delta) > 0.01D) {
+                health.addPermanentModifier(new AttributeModifier(HEALTH_MODIFIER, delta,
+                        AttributeModifier.Operation.ADD_VALUE));
+            }
+        }
+        AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.removeModifier(SPEED_MODIFIER);
+            double delta = rules.moveSpeed() - 1.0D;
+            if (Math.abs(delta) > 0.01D) {
+                speed.addPermanentModifier(new AttributeModifier(SPEED_MODIFIER, delta,
+                        AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
             }
         }
     }
 
+    /** Takes the mutator attributes back off, so leaving a match leaves no trace on a player. */
+    public static void clearMutators(ServerPlayer player) {
+        AttributeInstance health = player.getAttribute(Attributes.MAX_HEALTH);
+        if (health != null) health.removeModifier(HEALTH_MODIFIER);
+        AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) speed.removeModifier(SPEED_MODIFIER);
+        if (player.getHealth() > player.getMaxHealth()) player.setHealth(player.getMaxHealth());
+    }
+
     private void resetPlayer(ServerPlayer player) {
+        applyMutators(player);
         player.setGameMode(GameType.ADVENTURE);
         player.getInventory().clearContent();
         player.removeAllEffects();
@@ -802,6 +892,11 @@ public final class BattleGame {
         double dx = (centre.getX() + 0.5) - x;
         double dz = (centre.getZ() + 0.5) - z;
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        if (BattleBots.isBot(player.getUUID())) {
+            // A fake player has no connection, so the packet-based teleport would do nothing.
+            player.moveTo(x, y, z, yaw, 0f);
+            return;
+        }
         player.teleportTo(level(), x, y, z, Set.of(), yaw, 0f);
     }
 
@@ -824,12 +919,8 @@ public final class BattleGame {
 
     private void sendToLobby(ServerPlayer player) {
         BlockPos lobby = layout != null ? layout.lobby() : null;
-        if (lobby != null) {
-            player.teleportTo(level(), lobby.getX() + 0.5, lobby.above().getY(), lobby.getZ() + 0.5, Set.of(), 0f, 0f);
-        } else {
-            BlockPos centre = centre();
-            player.teleportTo(level(), centre.getX() + 0.5, centre.getY(), centre.getZ() + 0.5, Set.of(), 0f, 0f);
-        }
+        BlockPos target = lobby != null ? lobby.above() : centre();
+        faceCentre(player, target.getX() + 0.5, target.getY(), target.getZ() + 0.5);
     }
 
     private Component timerLine(int remainingTicks) {
@@ -865,7 +956,7 @@ public final class BattleGame {
         } else {
             stats.forEach((id, s) -> rows.put(s.name, sideWins.getOrDefault(sides.get(id), 0)));
         }
-        BattleHud.showSidebar(server, "Round " + round + " / best of " + (CoveBattleConfig.roundsToWin * 2 - 1), rows);
+        BattleHud.showSidebar(server, "Round " + round + " / best of " + rules.bestOf(), rows);
     }
 
     private String scoreLine() {
@@ -895,15 +986,33 @@ public final class BattleGame {
         List<UUID> result = new ArrayList<>();
         for (UUID id : participants) {
             if (eliminated.contains(id)) continue;
-            if (server.getPlayerList().getPlayer(id) == null) continue;
+            if (resolve(id) == null) continue;
             result.add(id);
         }
         return result;
     }
 
+    /** Participants resolve through the player list first, then the test bots. */
+    @Nullable
+    private ServerPlayer resolve(UUID id) {
+        ServerPlayer player = server.getPlayerList().getPlayer(id);
+        return player != null ? player : BattleBots.get(id);
+    }
+
     private List<ServerPlayer> onlineParticipants() {
         List<ServerPlayer> result = new ArrayList<>();
         for (UUID id : participants) {
+            ServerPlayer player = resolve(id);
+            if (player != null) result.add(player);
+        }
+        return result;
+    }
+
+    /** Only real players get packets; bots have no connection. */
+    private List<ServerPlayer> connectedParticipants() {
+        List<ServerPlayer> result = new ArrayList<>();
+        for (UUID id : participants) {
+            if (BattleBots.isBot(id)) continue;
             ServerPlayer player = server.getPlayerList().getPlayer(id);
             if (player != null) result.add(player);
         }
@@ -913,8 +1022,17 @@ public final class BattleGame {
     private List<ServerPlayer> onlineAlive() {
         List<ServerPlayer> result = new ArrayList<>();
         for (UUID id : alive()) {
-            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            ServerPlayer player = resolve(id);
             if (player != null) result.add(player);
+        }
+        return result;
+    }
+
+    /** Alive participants that can actually receive a HUD. */
+    private List<ServerPlayer> connectedAlive() {
+        List<ServerPlayer> result = new ArrayList<>();
+        for (ServerPlayer player : onlineAlive()) {
+            if (!BattleBots.isBot(player.getUUID())) result.add(player);
         }
         return result;
     }

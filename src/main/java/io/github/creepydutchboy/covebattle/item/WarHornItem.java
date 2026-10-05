@@ -42,7 +42,7 @@ public class WarHornItem extends AbilityItem {
         net.minecraft.world.item.ItemStack stack = player.getItemInHand(hand);
         if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer) {
             activate(serverLevel, serverPlayer);
-            serverPlayer.getCooldowns().addCooldown(this, 200);
+            serverPlayer.getCooldowns().addCooldown(this, scaledCooldown());
         }
         return net.minecraft.world.InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }

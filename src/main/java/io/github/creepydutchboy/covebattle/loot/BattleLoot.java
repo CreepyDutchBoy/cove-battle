@@ -1,6 +1,7 @@
 package io.github.creepydutchboy.covebattle.loot;
 
 import io.github.creepydutchboy.covebattle.registry.CBItems;
+import io.github.creepydutchboy.covebattle.rules.Mutators;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -121,13 +122,18 @@ public final class BattleLoot {
      *
      * @param centre whether this container sits inside the centre tier radius
      */
-    public static void fill(ServerLevel level, Container container, boolean centre, RandomSource random) {
+    public static void fill(ServerLevel level, Container container, boolean centre, RandomSource random, Mutators rules) {
         container.clearContent();
 
         List<Entry> pool = centre ? centre() : outer();
+        if (!rules.customItems()) {
+            // Classic: strip anything of ours, leaving the vanilla gear the console game had.
+            pool = pool.stream().filter(entry -> !isCustom(entry)).toList();
+        }
         int rolls = centre
                 ? CENTRE_ROLLS_MIN + random.nextInt(CENTRE_ROLLS_MAX - CENTRE_ROLLS_MIN + 1)
                 : OUTER_ROLLS_MIN + random.nextInt(OUTER_ROLLS_MAX - OUTER_ROLLS_MIN + 1);
+        rolls = Math.max(1, Math.round(rolls * rules.lootAmount()));
 
         Registry<Enchantment> enchantments = level.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
 
@@ -140,6 +146,12 @@ public final class BattleLoot {
             container.setItem(slot, stack);
         }
         container.setChanged();
+    }
+
+    private static boolean isCustom(Entry entry) {
+        return entry.item() == CBItems.COVESLAYER.get() || entry.item() == CBItems.STORM_EGG.get()
+                || entry.item() == CBItems.WAR_HORN.get() || entry.item() == CBItems.SIPHON_FLASK.get()
+                || entry.item() == CBItems.SMOKE_BOMB.get() || entry.item() == CBItems.GHOST_BOOTS.get();
     }
 
     private static Entry pick(List<Entry> pool, RandomSource random) {

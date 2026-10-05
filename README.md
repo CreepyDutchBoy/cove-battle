@@ -24,6 +24,38 @@ Drop `covebattle.jar` into your instance's `mods/` folder. For the PrismLauncher
 After that you never install it by hand again: every later version arrives through the
 built-in updater.
 
+## Modes and mutators
+
+Three rule sets, picked in **Modes & Mutators** (main menu hub, or `/cbmutators` in game, or
+`/covebattle mode`):
+
+| Mode | What it is |
+|---|---|
+| **Classic** | The console mini game: vanilla loot only, no custom gear, no screen effects, no closing border — Showdown is glowing survivors, as on console. 180s rounds. |
+| **Remastered** *(default)* | Classic plus the custom items, the screen shaders and the closing border. 90s rounds. |
+| **Mutators** | Remastered with every number exposed on a slider. |
+
+Twenty tunables, each a slider: grace period, fight length, border step, border floor, restock
+interval and count, rounds to win, loot amount, max health, damage dealt, move speed, ability
+cooldown, and toggles for custom items, fall damage, hunger, natural regen, friendly fire,
+showdown glow, closing border and screen effects.
+
+The board is server-authoritative. The client edits a local copy, **Apply** sends one payload, the
+server checks you are an operator and broadcasts the result, so everyone's board agrees. Settings
+persist to `config/covebattle-rules.json`. Picking Classic or Remastered loads that preset into the
+sliders, so a preset is a starting point rather than a dead end.
+
+Command-line equivalents: `/covebattle mode <classic|remastered|mutators>`,
+`/covebattle mutator list`, `/covebattle mutator set <key> <value>`,
+`/covebattle mutator preset <classic|remastered>`.
+
+## Testing with bots
+
+`/covebattle bot add <n>` spawns stand-in players built on NeoForge's `FakePlayer`, so team
+assignment, eliminations and round and match transitions can be exercised with nobody connected.
+`/covebattle bot kill <name>` eliminates one, `bot list` and `bot clear` do the obvious. They are
+real `ServerPlayer` instances, so they take the same path a human does.
+
 ## How a match plays
 
 | Phase | What happens |
