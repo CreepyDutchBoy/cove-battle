@@ -41,6 +41,13 @@ public final class CoveBattleCommands {
     private CoveBattleCommands() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        // Standalone alias so testing never needs a second account or a second launcher.
+        dispatcher.register(Commands.literal("spawnplayer")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> spawnPlayer(ctx.getSource(), "CoveBot" + (BattleBots.count() + 1)))
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .executes(ctx -> spawnPlayer(ctx.getSource(), StringArgumentType.getString(ctx, "name")))));
+
         dispatcher.register(Commands.literal("covebattle")
                 .executes(ctx -> status(ctx.getSource()))
 
@@ -185,6 +192,22 @@ public final class CoveBattleCommands {
 
     // ---- test bots ----
 
+    /**
+     * Spawns one stand-in player at the caller's position. It is a real ServerPlayer, so it joins
+     * matches, takes a team and can be eliminated like anyone else.
+     */
+    private static int spawnPlayer(CommandSourceStack source, String name) {
+        ServerLevel level = source.getLevel();
+        ServerPlayer bot = BattleBots.spawn(level, name);
+        var pos = source.getPosition();
+        bot.moveTo(pos.x, pos.y, pos.z, 0f, 0f);
+        source.sendSuccess(() -> Component.literal("Spawned ").withStyle(ChatFormatting.GREEN)
+                .append(Component.literal(name).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" - it will join the next match. " + BattleBots.count() + " stand-in(s) active.")
+                        .withStyle(ChatFormatting.GRAY)), false);
+        return 1;
+    }
+
     private static int addBots(CommandSourceStack source, int count) {
         ServerLevel level = source.getServer().overworld();
         int before = BattleBots.count();
@@ -289,6 +312,9 @@ public final class CoveBattleCommands {
         source.sendSuccess(() -> Component.literal("Managed jar: ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(UpdateBridge.settings().modsDir().resolve(UpdateBridge.JAR_NAME).toString())
                         .withStyle(ChatFormatting.DARK_GRAY)), false);
+        source.sendSuccess(() -> Component.literal("Environment: ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(io.github.creepydutchboy.covebattle.update.Environment.describe())
+                        .withStyle(ChatFormatting.WHITE)), false);
         source.sendSuccess(() -> describe(UpdateBridge.last()), false);
         return 1;
     }

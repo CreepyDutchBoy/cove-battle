@@ -1,0 +1,26 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+issueTrackerURL = "https://github.com/${update_repo_owner}/${update_repo_name}/issues"
+
+[[mods]]
+modId = "covebattleboot"
+version = "${bootstrap_version}"
+displayName = "Cove Battle Installer"
+displayURL = "https://github.com/${update_repo_owner}/${update_repo_name}"
+authors = "${mod_authors}"
+description = '''Tiny installer for Cove Battle. Downloads the full mod on first launch, then steps aside.'''
+
+[[dependencies.covebattleboot]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.covebattleboot]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"

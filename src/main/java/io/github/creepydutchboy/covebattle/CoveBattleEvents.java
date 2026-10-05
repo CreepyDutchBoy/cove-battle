@@ -4,6 +4,7 @@ import io.github.creepydutchboy.covebattle.command.CoveBattleCommands;
 import io.github.creepydutchboy.covebattle.game.Announcer;
 import io.github.creepydutchboy.covebattle.game.BattleGame;
 import io.github.creepydutchboy.covebattle.game.BattleManager;
+import io.github.creepydutchboy.covebattle.lobby.LobbyState;
 import io.github.creepydutchboy.covebattle.rules.RulesState;
 import io.github.creepydutchboy.covebattle.update.UpdateOutcome;
 import net.minecraft.ChatFormatting;
@@ -40,6 +41,11 @@ public final class CoveBattleEvents {
                 CoveBattle.MOD_NAME, UpdateBridge.modVersion(), UpdateBridge.mcVersion());
         RulesState.load(event.getServer().getServerDirectory().resolve("config"));
         BattleManager.onServerStarted(event.getServer());
+    }
+
+    @SubscribeEvent
+    static void onPlayerLeave(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) LobbyState.onPlayerLeave(player);
     }
 
     @SubscribeEvent
@@ -120,6 +126,7 @@ public final class CoveBattleEvents {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         RulesState.syncTo(player);
+        LobbyState.onPlayerJoin(player);
 
         BattleGame game = BattleManager.game();
         if (game != null) game.onPlayerJoin(player);

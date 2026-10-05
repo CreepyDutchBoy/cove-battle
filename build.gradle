@@ -38,6 +38,47 @@ neoForge {
     }
 }
 
+// ---------------------------------------------------------------------------
+// A second, tiny jar: the installer. It shares no classes with the main mod, so the two can sit in
+// the same mods folder without the loader seeing duplicate packages.
+// ---------------------------------------------------------------------------
+sourceSets {
+    bootstrap {
+        java.srcDirs = ['src/bootstrap/java']
+        resources.srcDirs = []
+    }
+}
+
+configurations {
+    bootstrapCompileClasspath.extendsFrom compileClasspath
+}
+
+var generateBootstrapMetadata = tasks.register("generateBootstrapMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version_range: minecraft_version_range,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_license            : mod_license,
+            mod_authors            : mod_authors,
+            bootstrap_version      : bootstrap_version,
+            update_repo_owner      : update_repo_owner,
+            update_repo_name       : update_repo_name
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/bootstrap/templates"
+    into "build/generated/sources/bootstrapMetadata"
+}
+
+tasks.register('bootstrapJar', Jar) {
+    description = 'Builds the lightweight installer jar.'
+    group = 'build'
+    archiveBaseName = 'covebattle-installer'
+    archiveVersion = bootstrap_version
+    from sourceSets.bootstrap.output
+    from generateBootstrapMetadata
+}
+
 // Expands ${...} placeholders in src/main/templates (neoforge.mods.toml) using gradle.properties.
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
@@ -90,6 +131,8 @@ tasks.register('packageDist') {
     inputs.property 'modVersion', modVersion
     outputs.dir outDir
 
+    dependsOn tasks.named('bootstrapJar')
+
     doLast {
         def dir = outDir.get().asFile
         dir.deleteDir()
@@ -110,6 +153,14 @@ tasks.register('packageDist') {
                         jar         : "${modid}.jar".toString(),
                         sha256      : sha
                 ]))
+
+        // The installer rides along as its own asset, so it can be handed out separately.
+        def installer = tasks.named('bootstrapJar').get().archiveFile.get().asFile
+        if (installer.exists()) {
+            def copy = new File(dir, "covebattle-installer.jar")
+            copy.bytes = installer.bytes
+            logger.lifecycle("Staged installer {} ({} KB)", copy.name, (copy.length() / 1024) as int)
+        }
 
         logger.lifecycle("Staged release assets in {} (version {}, sha256 {})", dir, modVersion, sha)
     }

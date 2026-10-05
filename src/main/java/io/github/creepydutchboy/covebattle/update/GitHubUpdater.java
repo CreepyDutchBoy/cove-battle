@@ -132,7 +132,10 @@ public final class GitHubUpdater {
 
     private UpdateOutcome install(UpdateManifest manifest, String jarUrl) throws IOException, InterruptedException {
         Path modsDir = settings.modsDir();
-        Files.createDirectories(modsDir);
+        String problem = Environment.checkWritable(modsDir);
+        if (problem != null) {
+            return new UpdateOutcome(UpdateStatus.FAILED, problem, manifest.version());
+        }
         Path target = modsDir.resolve(settings.jarName());
         Path temp = modsDir.resolve(settings.jarName() + ".part");
         Files.deleteIfExists(temp);
@@ -165,7 +168,7 @@ public final class GitHubUpdater {
 
             move(temp, target);
             int removed = removeStaleJars(modsDir, target);
-            log.accept("Installed " + settings.jarName() + " " + manifest.version()
+            log.accept("Installed " + settings.jarName() + " " + manifest.version() + " [" + Environment.describe() + "]"
                     + (removed > 0 ? " and removed " + removed + " superseded jar(s)" : ""));
 
             return new UpdateOutcome(UpdateStatus.UPDATE_INSTALLED,
@@ -179,11 +182,22 @@ public final class GitHubUpdater {
         }
     }
 
+    /**
+     * The staged file already sits in the mods directory, so this is normally a same-filesystem
+     * rename. The fallbacks exist for sandboxed and unusual mounts where that is not guaranteed.
+     */
     private static void move(Path from, Path to) throws IOException {
         try {
             Files.move(from, to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
+            return;
+        } catch (AtomicMoveNotSupportedException | SecurityException e) {
+            // fall through to a plain move, then to copy-and-delete
+        }
+        try {
             Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
+            Files.deleteIfExists(from);
         }
     }
 

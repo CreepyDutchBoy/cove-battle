@@ -43,6 +43,9 @@ public final class UpdaterCli {
         System.out.println("current   : " + settings.currentVersion());
         System.out.println("minecraft : " + settings.mcVersion());
         System.out.println("mods dir  : " + settings.modsDir());
+        System.out.println("environment: " + Environment.describe());
+        String writeProblem = Environment.checkWritable(settings.modsDir());
+        System.out.println("writable  : " + (writeProblem == null ? "yes" : "NO - " + writeProblem));
         System.out.println("channel   : " + (prerelease ? "stable + prerelease" : "stable only"));
         System.out.println("mode      : " + (apply ? "check and install" : "check only"));
         System.out.println();

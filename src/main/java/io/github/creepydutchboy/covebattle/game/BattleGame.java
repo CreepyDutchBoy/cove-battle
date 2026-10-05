@@ -52,6 +52,8 @@ public final class BattleGame {
 
     private static final double VANILLA_BORDER_SIZE = 59999968.0D;
     private static final int TIE_HOLD_SECONDS = 30;
+    /** How long a match waits when one side empties out, before awarding it to the side still there. */
+    private static final int EMPTY_SIDE_GRACE_TICKS = 20 * 20;
     private static final double BORDER_STEP_FACTOR = 0.75D;
 
     private final MinecraftServer server;
@@ -86,6 +88,7 @@ public final class BattleGame {
     private int restockTicks;
     private int tieTicks;
     private int pingUntilTick = -1;
+    private int pausedTicks;
     private int lastPingSecond = -1;
     @Nullable
     private String roundWinnerSide;
@@ -182,6 +185,8 @@ public final class BattleGame {
 
         List<ServerPlayer> candidates = new ArrayList<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            // Anyone sitting in the lobby menu is a spectator of sorts: they are not drafted in.
+            if (io.github.creepydutchboy.covebattle.lobby.LobbyState.isInLobby(player.getUUID())) continue;
             GameType gameMode = player.gameMode.getGameModeForPlayer();
             if (gameMode == GameType.SURVIVAL || gameMode == GameType.ADVENTURE) candidates.add(player);
         }
@@ -336,6 +341,7 @@ public final class BattleGame {
     }
 
     private void tickFight() {
+        if (emptySidePause()) return;
         int total = rules.matchTicks();
         int remaining = Math.max(0, total - phaseTicks);
 
@@ -400,6 +406,7 @@ public final class BattleGame {
     }
 
     private void tickShowdown() {
+        if (emptySidePause()) return;
         WorldBorder border = level().getWorldBorder();
 
         if (rules.showdownGlow() && phaseTicks % 40 == 0) {
@@ -595,6 +602,7 @@ public final class BattleGame {
         phase = GamePhase.LOBBY;
         phaseTicks = 0;
         round = 0;
+        pausedTicks = 0;
         eliminated.clear();
         roundWinnerSide = null;
 
@@ -696,6 +704,85 @@ public final class BattleGame {
             // not a uuid-shaped side; fall through
         }
         return side;
+    }
+
+    // ------------------------------------------------------------------ lobby interaction
+
+    public boolean isParticipant(UUID id) {
+        return participants.contains(id);
+    }
+
+    public boolean isEliminated(UUID id) {
+        return eliminated.contains(id);
+    }
+
+    /** "Red", "Blue", or the player's own name in free-for-all. Empty when not in the match. */
+    public String sideLabelOf(UUID id) {
+        String side = sides.get(id);
+        return side == null ? "" : sideLabel(side);
+    }
+
+    /**
+     * Someone went to the lobby or disconnected. They are out of the running match; everyone else
+     * carries on, and if that empties a side the match pauses rather than ending on the spot.
+     */
+    public void onParticipantLeft(ServerPlayer player) {
+        if (!participants.contains(player.getUUID())) return;
+        if (phase.isLive() && !eliminated.contains(player.getUUID())) {
+            eliminated.add(player.getUUID());
+            Announcer.broadcast(server, Announcer.prefix().append(Component
+                    .literal(player.getGameProfile().getName() + " left the match.")
+                    .withStyle(ChatFormatting.GRAY)));
+        }
+        clearMutators(player);
+        player.setInvulnerable(false);
+        player.removeEffect(MobEffects.GLOWING);
+        if (!emptySidePause()) checkRoundOver();
+    }
+
+    /**
+     * Holds the match when one side has nobody left in it, giving someone time to take their place.
+     * Console Battle has nothing like this; it exists because the lobby lets people come and go.
+     *
+     * @return true when the match is paused and the phase should not advance
+     */
+    private boolean emptySidePause() {
+        if (!phase.isLive()) return false;
+
+        Set<String> present = new LinkedHashSet<>();
+        for (UUID id : alive()) {
+            String side = sides.get(id);
+            if (side != null) present.add(side);
+        }
+        Set<String> allSides = new LinkedHashSet<>(sides.values());
+        boolean someoneMissing = allSides.size() > 1 && present.size() < allSides.size() && !present.isEmpty();
+
+        if (!someoneMissing) {
+            if (pausedTicks > 0) {
+                pausedTicks = 0;
+                Announcer.broadcast(server, Announcer.prefix()
+                        .append(Component.literal("Both sides are back — play on.").withStyle(ChatFormatting.GREEN)));
+            }
+            return false;
+        }
+
+        pausedTicks++;
+        int remaining = EMPTY_SIDE_GRACE_TICKS - pausedTicks;
+        if (remaining <= 0) {
+            String winner = present.iterator().next();
+            endRound(winner, sideLabel(winner) + " takes it — the other side had nobody left.");
+            pausedTicks = 0;
+            return true;
+        }
+
+        hud.setBar(Component.literal("Waiting for players — " + ((remaining + 19) / 20) + "s")
+                .withStyle(ChatFormatting.YELLOW), (float) remaining / EMPTY_SIDE_GRACE_TICKS,
+                BossEvent.BossBarColor.YELLOW);
+        for (ServerPlayer player : connectedAlive()) {
+            BattleHud.actionBar(player, Component.literal("Paused — waiting for an opponent ("
+                    + ((remaining + 19) / 20) + "s)").withStyle(ChatFormatting.YELLOW));
+        }
+        return true;
     }
 
     // ------------------------------------------------------------------ player events
